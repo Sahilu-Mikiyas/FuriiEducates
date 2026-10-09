@@ -80,7 +80,7 @@ func (a *API) updateSchool(w http.ResponseWriter, r *http.Request, id auth.Ident
 	var school struct { ID string `json:"id"`; Name string `json:"name"`; Timezone string `json:"timezone"`; DefaultLanguage string `json:"default_language"` }
 	err=tx.QueryRow(r.Context(),`UPDATE schools SET name=$2,timezone=$3,default_language=$4 WHERE id=$1 RETURNING id::text,name,timezone,default_language`,id.SchoolID,req.Name,req.Timezone,req.DefaultLanguage).Scan(&school.ID,&school.Name,&school.Timezone,&school.DefaultLanguage)
 	if err!=nil { a.databaseError(w,r,err); return }
-	_,err=tx.Exec(r.Context(),`INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'school.updated','school',$1,jsonb_build_object('name',$3,'timezone',$4,'default_language',$5))`,id.SchoolID,id.UserID,req.Name,req.Timezone,req.DefaultLanguage)
+	_,err=tx.Exec(r.Context(),`INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'school.updated','school',$1,jsonb_build_object('name',$3::text,'timezone',$4::text,'default_language',$5::text))`,id.SchoolID,id.UserID,req.Name,req.Timezone,req.DefaultLanguage)
 	if err!=nil { a.serverError(w,r,err); return }; if err=tx.Commit(r.Context()); err!=nil { a.serverError(w,r,err); return }; writeJSON(w,200,map[string]any{"data":school})
 }
 
@@ -137,7 +137,7 @@ func (a *API) createStudent(w http.ResponseWriter,r *http.Request,id auth.Identi
 	err=tx.QueryRow(r.Context(),`INSERT INTO students(school_id,student_number,legal_name,date_of_birth,preferred_language) VALUES($1,$2,$3,$4,NULLIF($5,'')) RETURNING id::text,student_number,legal_name,COALESCE(preferred_language,''),status`,id.SchoolID,req.StudentNumber,req.LegalName,dob,strings.TrimSpace(req.PreferredLanguage)).Scan(&student.ID,&student.StudentNumber,&student.LegalName,&student.PreferredLanguage,&student.Status)
 	if err!=nil { a.databaseError(w,r,err); return }
 	if req.ClassID!="" { tag,e:=tx.Exec(r.Context(),`INSERT INTO enrollments(school_id,student_id,class_id) SELECT $1,$2,c.id FROM classes c WHERE c.id=$3 AND c.school_id=$1`,id.SchoolID,student.ID,req.ClassID); if e!=nil { a.databaseError(w,r,e); return }; if tag.RowsAffected()!=1 { writeError(w,400,"VALIDATION_ERROR","Class does not belong to this school.",map[string]string{"class_id":"Unknown class."}); return } }
-	if _,err:=tx.Exec(r.Context(),`INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'student.created','student',$3,jsonb_build_object('student_number',$4,'class_id',NULLIF($5,'')))`,id.SchoolID,id.UserID,student.ID,student.StudentNumber,req.ClassID); err!=nil { a.serverError(w,r,err); return }
+	if _,err:=tx.Exec(r.Context(),`INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'student.created','student',$3,jsonb_build_object('student_number',$4::text,'class_id',NULLIF($5::text,'')))`,id.SchoolID,id.UserID,student.ID,student.StudentNumber,req.ClassID); err!=nil { a.serverError(w,r,err); return }
 	if err:=tx.Commit(r.Context()); err!=nil { a.serverError(w,r,err); return }; writeJSON(w,201,map[string]any{"data":student})
 }
 
@@ -153,7 +153,7 @@ func (a *API) updateStudent(w http.ResponseWriter,r *http.Request,id auth.Identi
 	var studentID string
 	err=tx.QueryRow(r.Context(),`UPDATE students SET legal_name=$3,preferred_language=NULLIF($4,''),status=$5 WHERE id=$1 AND school_id=$2 RETURNING id::text`,r.PathValue("studentID"),id.SchoolID,req.LegalName,strings.TrimSpace(req.PreferredLanguage),req.Status).Scan(&studentID)
 	if err!=nil { a.databaseError(w,r,err); return }
-	if _,err=tx.Exec(r.Context(),`INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'student.updated','student',$3,jsonb_build_object('legal_name',$4,'preferred_language',$5,'status',$6))`,id.SchoolID,id.UserID,studentID,req.LegalName,strings.TrimSpace(req.PreferredLanguage),req.Status); err!=nil { a.serverError(w,r,err); return }
+	if _,err=tx.Exec(r.Context(),`INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'student.updated','student',$3,jsonb_build_object('legal_name',$4::text,'preferred_language',$5::text,'status',$6::text))`,id.SchoolID,id.UserID,studentID,req.LegalName,strings.TrimSpace(req.PreferredLanguage),req.Status); err!=nil { a.serverError(w,r,err); return }
 	if err=tx.Commit(r.Context()); err!=nil { a.serverError(w,r,err); return }; student,err:=a.fetchStudent(r.Context(),id.SchoolID,r.PathValue("studentID")); if err!=nil { a.databaseError(w,r,err); return }; writeJSON(w,200,map[string]any{"data":student})
 }
 

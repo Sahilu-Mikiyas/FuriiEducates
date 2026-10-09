@@ -74,6 +74,7 @@ jobs:
           if [ "$login" != "200" ]; then body=$(cat "$RUNNER_TEMP/login.json"); echo "::error title=FURII smoke test::POST /api/v1/auth/login returned HTTP $login: $body"; exit 1; fi
           school=$(api_request GET /api/v1/school)
           if ! echo "$school" | jq -e '.data.name == "FURII CI School"'; then echo "::error title=FURII smoke test::Unexpected school response: $school"; exit 1; fi
+          school=$(api_request PATCH /api/v1/school '{"name":"FURII CI School","timezone":"Africa/Addis_Ababa","default_language":"en"}')
           year=$(api_request POST /api/v1/academic-years '{"name":"2026-2027","starts_on":"2026-09-01","ends_on":"2027-07-01"}')
           if ! year_id=$(echo "$year" | jq -er '.data.id'); then echo "::error title=FURII smoke test::Unexpected academic-year response: $year"; exit 1; fi
           class=$(api_request POST /api/v1/classes "{\"name\":\"Section A\",\"grade_level\":\"9\",\"academic_year_id\":\"$year_id\"}")
@@ -82,6 +83,8 @@ jobs:
           if ! student_id=$(echo "$student" | jq -er '.data.id'); then echo "::error title=FURII smoke test::Unexpected student response: $student"; exit 1; fi
           fetched=$(api_request GET "/api/v1/students/$student_id")
           if ! echo "$fetched" | jq -e '.data.legal_name == "Test Learner"'; then echo "::error title=FURII smoke test::Unexpected student detail response: $fetched"; exit 1; fi
+          updated=$(api_request PATCH "/api/v1/students/$student_id" '{"legal_name":"Test Learner Updated","preferred_language":"en","status":"active"}')
+          if ! echo "$updated" | jq -e '.data.legal_name == "Test Learner Updated"'; then echo "::error title=FURII smoke test::Unexpected updated-student response: $updated"; exit 1; fi
       - name: Build web application
         working-directory: apps/web
         run: npm ci && npm run build
