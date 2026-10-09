@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -79,11 +80,24 @@ func HashPassword(password string) (string, error) {
 }
 
 func verifyPassword(encoded, password string) bool {
-	var saltRaw, hashRaw string; var memory, iterations uint32; var parallelism uint8; var version int
-	if _, err := fmt.Sscanf(encoded, "$argon2id$v=%d$m=%d,t=%d,p=%d$%s", &version, &memory, &iterations, &parallelism, &saltRaw); err != nil || version != 19 { return false }
-	parts := strings.Split(saltRaw, "$"); if len(parts) != 2 { return false }; saltRaw, hashRaw = parts[0], parts[1]
-	salt, e1 := base64.RawStdEncoding.DecodeString(saltRaw); expected, e2 := base64.RawStdEncoding.DecodeString(hashRaw)
-	if e1 != nil || e2 != nil || memory < 32768 || memory > 262144 || iterations < 2 || iterations > 10 || parallelism == 0 || parallelism > 8 { return false }
+	parts := strings.Split(encoded, "$")
+	if len(parts) != 6 || parts[0] != "" || parts[1] != "argon2id" || parts[2] != "v=19" {
+		return false
+	}
+	params := map[string]string{}
+	for _, item := range strings.Split(parts[3], ",") {
+		key, value, ok := strings.Cut(item, "=")
+		if !ok { return false }
+		params[key] = value
+	}
+	memory64, e1 := strconv.ParseUint(params["m"], 10, 32)
+	iterations64, e2 := strconv.ParseUint(params["t"], 10, 32)
+	parallelism64, e3 := strconv.ParseUint(params["p"], 10, 8)
+	if e1 != nil || e2 != nil || e3 != nil { return false }
+	memory, iterations, parallelism := uint32(memory64), uint32(iterations64), uint8(parallelism64)
+	salt, e1 := base64.RawStdEncoding.DecodeString(parts[4])
+	expected, e2 := base64.RawStdEncoding.DecodeString(parts[5])
+	if e1 != nil || e2 != nil || len(salt) < 16 || len(expected) < 16 || memory < 32768 || memory > 262144 || iterations < 2 || iterations > 10 || parallelism == 0 || parallelism > 8 { return false }
 	actual := argon2.IDKey([]byte(password), salt, iterations, memory, parallelism, uint32(len(expected)))
 	return hmac.Equal(actual, expected)
 }

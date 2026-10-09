@@ -60,10 +60,11 @@ jobs:
             sleep 1
           done
           if ! curl --fail --silent http://localhost:8080/healthz >/dev/null; then cat "$RUNNER_TEMP/furii-api.log"; exit 1; fi
-          curl --fail --silent --show-error -c "$RUNNER_TEMP/cookies.txt" \
+          login_status=$(curl --silent --show-error -w '%{http_code}' -o "$RUNNER_TEMP/login.json" -c "$RUNNER_TEMP/cookies.txt" \
             -H 'Content-Type: application/json' \
             -d '{"email":"admin@example.test","password":"ci-test-password-long-enough"}' \
-            http://localhost:8080/api/v1/auth/login > "$RUNNER_TEMP/login.json"
+            http://localhost:8080/api/v1/auth/login)
+          if [ "$login_status" != "200" ]; then cat "$RUNNER_TEMP/login.json"; echo "Login returned HTTP $login_status"; exit 1; fi
           curl --fail --silent --show-error -b "$RUNNER_TEMP/cookies.txt" \
             http://localhost:8080/api/v1/school | jq -e '.data.name == "FURII CI School"'
           year=$(curl --fail --silent --show-error -b "$RUNNER_TEMP/cookies.txt" \
