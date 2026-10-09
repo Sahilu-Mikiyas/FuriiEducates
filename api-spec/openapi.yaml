@@ -102,6 +102,75 @@ paths:
       responses:
         '200': { description: Updated student }
         '404': { description: Student not found }
+  /students/{studentID}/academic-records:
+    parameters:
+      - name: studentID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: List previous academic records
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Academic history records }
+    post:
+      summary: Add a historical school result
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Academic record created }
+  /students/{studentID}/external-exams:
+    parameters:
+      - name: studentID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: List external examination results and section breakdowns
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: External exam history }
+    post:
+      summary: Add an external examination result
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: External exam result created }
+  /import-jobs/preview:
+    post:
+      summary: Validate an academic records CSV without importing it
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: { type: string }
+      responses:
+        '201': { description: Preview with valid row count and row errors }
+        '400': { description: Malformed CSV or header }
+        '413': { description: File exceeds size or row limit }
+  /import-jobs/{jobID}:
+    parameters:
+      - name: jobID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Read a school-scoped academic import preview
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Preview status and row errors }
+        '404': { description: Import job not found }
+  /import-jobs/{jobID}/commit:
+    parameters:
+      - name: jobID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      summary: Commit a clean academic import preview exactly once
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Import committed }
+        '409': { description: Preview contains errors or has already been committed }
 components:
   securitySchemes:
     sessionCookie:

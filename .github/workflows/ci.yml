@@ -85,6 +85,18 @@ jobs:
           if ! echo "$fetched" | jq -e '.data.legal_name == "Test Learner"'; then echo "::error title=FURII smoke test::Unexpected student detail response: $fetched"; exit 1; fi
           updated=$(api_request PATCH "/api/v1/students/$student_id" '{"legal_name":"Test Learner Updated","preferred_language":"en","status":"active"}')
           if ! echo "$updated" | jq -e '.data.legal_name == "Test Learner Updated"'; then echo "::error title=FURII smoke test::Unexpected updated-student response: $updated"; exit 1; fi
+          api_request POST "/api/v1/students/$student_id/academic-records" '{"school_name":"Previous School","academic_year_label":"2024-2025","grade_level":"8","subject_name":"Mathematics","score":85,"maximum_score":100,"grade_label":"B","source_type":"staff_entry"}' >/dev/null
+          records=$(api_request GET "/api/v1/students/$student_id/academic-records")
+          if ! echo "$records" | jq -e 'any(.data[]; .subject_name == "Mathematics" and .score == 85)'; then echo "::error title=FURII smoke test::Academic record was not returned: $records"; exit 1; fi
+          api_request POST "/api/v1/students/$student_id/external-exams" '{"exam_name":"IELTS","exam_provider":"British Council","exam_date":"2026-09-01","score":7.5,"maximum_score":9,"breakdowns":[{"section_name":"Reading","score":8,"maximum_score":9}]}' >/dev/null
+          exams=$(api_request GET "/api/v1/students/$student_id/external-exams")
+          if ! echo "$exams" | jq -e 'any(.data[]; .exam_name == "IELTS" and .breakdowns[0].section_name == "Reading")'; then echo "::error title=FURII smoke test::External exam breakdown was not returned: $exams"; exit 1; fi
+          printf 'student_number,school_name,academic_year_label,grade_level,subject_name,score,maximum_score,grade_label,source_type\nCI-001,Prior School,2023-2024,Grade 8,English,78,100,C,school_import\n' > "$RUNNER_TEMP/academic-records.csv"
+          preview_status=$(curl --silent --show-error -o "$RUNNER_TEMP/import-preview.json" -w '%{http_code}' -b "$RUNNER_TEMP/cookies.txt" -H 'Content-Type: text/csv' --data-binary @"$RUNNER_TEMP/academic-records.csv" http://localhost:8080/api/v1/import-jobs/preview)
+          if [ "$preview_status" != "201" ]; then body=$(cat "$RUNNER_TEMP/import-preview.json"); echo "::error title=FURII smoke test::CSV preview returned HTTP $preview_status: $body"; exit 1; fi
+          job_id=$(jq -er '.data.id' "$RUNNER_TEMP/import-preview.json")
+          imported=$(api_request POST "/api/v1/import-jobs/$job_id/commit" '{}')
+          if ! echo "$imported" | jq -e '.data.status == "committed" and .data.imported_rows == 1'; then echo "::error title=FURII smoke test::CSV commit failed: $imported"; exit 1; fi
       - name: Build web application
         working-directory: apps/web
         run: npm ci && npm run build
