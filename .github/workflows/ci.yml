@@ -44,7 +44,7 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - name: Build API
         working-directory: services/api
-        run: go mod download && go build ./...
+        run: go mod tidy && go build ./...
       - name: Apply database migrations
         working-directory: services/api
         run: go run github.com/pressly/goose/v3/cmd/goose@v3.24.1 -dir migrations postgres "$DATABASE_URL" up
