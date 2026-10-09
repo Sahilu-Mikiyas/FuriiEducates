@@ -10,6 +10,10 @@ type Student = { id: string; student_number: string; legal_name: string; preferr
 type AcademicRecord = { id: string; school_name: string; academic_year_label: string; grade_level: string; subject_name: string; score: number | null; maximum_score: number | null; grade_label: string; grading_scale_name: string; source_type: string; verification_status: string }
 type ExternalExam = { id: string; exam_name: string; exam_provider: string; exam_date: string; subject_or_section: string; score: number | null; maximum_score: number | null; score_label: string; verification_status: string; breakdowns: { section_name: string; score: number | null; maximum_score: number | null }[] }
 type ImportPreview = { id: string; status: string; row_count: number; valid_rows: number; error_rows: number; can_commit: boolean; row_errors: { row: number; errors: string[] }[] }
+type Curriculum = { id: string; name: string; provider: string; country_code: string; version_label: string; language_code: string; source_reference: string; license_notes: string }
+type Subject = { id: string; name: string; grade_level: string; subject_code: string }
+type CurriculumNode = { id: string; parent_id: string; node_type: string; code: string; title: string; description: string; sort_order: number }
+type Question = { id: string; question_type: string; prompt: { text?: string }; options: { id: string; text: string }[] | null; explanation: { text?: string } | null; difficulty: number | null; language_code: string; source_name: string; source_reference: string; license_notes: string; status: string; skill_tags: { skill_id: string; title: string; weight: number }[] }
 
 const api = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const headers = new Headers(init?.headers)
@@ -34,6 +38,12 @@ function App() {
   const [academicRecords, setAcademicRecords] = useState<AcademicRecord[]>([])
   const [externalExams, setExternalExams] = useState<ExternalExam[]>([])
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
+  const [curricula, setCurricula] = useState<Curriculum[]>([])
+  const [subjects, setSubjects] = useState<Subject[]>([])
+  const [curriculumNodes, setCurriculumNodes] = useState<CurriculumNode[]>([])
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [curriculumID, setCurriculumID] = useState('')
+  const [subjectID, setSubjectID] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -62,6 +72,25 @@ function App() {
       .catch((e) => { if (!ignore) setError(e instanceof Error ? e.message : 'Unable to load academic history.') })
     return () => { ignore = true }
   }, [passportStudent])
+
+  useEffect(() => {
+    if (!identity) return
+    Promise.all([api<Curriculum[]>('/curricula'), api<Question[]>('/questions')]).then(([cs, qs]) => {
+      setCurricula(cs); setQuestions(qs); setCurriculumID((current) => current || cs[0]?.id || '')
+    }).catch((e) => setError(e instanceof Error ? e.message : 'Unable to load curriculum workspace.'))
+  }, [identity])
+
+  useEffect(() => {
+    if (!curriculumID) { setSubjects([]); setSubjectID(''); return }
+    api<Subject[]>(`/curricula/${curriculumID}/subjects`).then((items) => { setSubjects(items); setSubjectID((current) => items.some((x) => x.id === current) ? current : items[0]?.id || '') })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Unable to load subjects.'))
+  }, [curriculumID])
+
+  useEffect(() => {
+    if (!subjectID) { setCurriculumNodes([]); return }
+    api<CurriculumNode[]>(`/subjects/${subjectID}/nodes`).then(setCurriculumNodes)
+      .catch((e) => setError(e instanceof Error ? e.message : 'Unable to load curriculum skills.'))
+  }, [subjectID])
 
   async function submit(event: FormEvent<HTMLFormElement>, action: () => Promise<void>, message: string) {
     event.preventDefault(); setError(''); setNotice(''); setBusy(true)
@@ -106,6 +135,41 @@ function App() {
       const records = await api<AcademicRecord[]>(`/students/${passportStudent}/academic-records`)
       setAcademicRecords(records)
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to commit the import.') } finally { setBusy(false) }
+  }
+
+  async function createCurriculum(event: FormEvent<HTMLFormElement>) {
+    const form = event.currentTarget
+    const f = new FormData(form)
+    const created = await api<{ id: string }>('/curricula', { method: 'POST', body: JSON.stringify({ name: f.get('curriculum_name'), provider: f.get('provider'), country_code: f.get('country_code'), version_label: f.get('version_label'), language_code: f.get('language_code') || 'en', source_reference: f.get('curriculum_source'), license_notes: f.get('curriculum_license') }) })
+    const items = await api<Curriculum[]>('/curricula'); setCurricula(items); setCurriculumID(created.id); form.reset()
+  }
+
+  async function createSubject(event: FormEvent<HTMLFormElement>) {
+    const form = event.currentTarget; const f = new FormData(form)
+    await api(`/curricula/${curriculumID}/subjects`, { method: 'POST', body: JSON.stringify({ name: f.get('subject_name'), grade_level: f.get('grade_level'), subject_code: f.get('subject_code') }) })
+    setSubjects(await api<Subject[]>(`/curricula/${curriculumID}/subjects`)); form.reset()
+  }
+
+  async function createNode(event: FormEvent<HTMLFormElement>) {
+    const form = event.currentTarget; const f = new FormData(form)
+    await api(`/subjects/${subjectID}/nodes`, { method: 'POST', body: JSON.stringify({ parent_id: f.get('parent_id'), node_type: f.get('node_type'), code: f.get('node_code'), title: f.get('node_title'), description: f.get('node_description'), sort_order: Number(f.get('sort_order') || 0) }) })
+    setCurriculumNodes(await api<CurriculumNode[]>(`/subjects/${subjectID}/nodes`)); form.reset()
+  }
+
+  async function createQuestion(event: FormEvent<HTMLFormElement>) {
+    const form = event.currentTarget; const f = new FormData(form); const type = String(f.get('question_type'))
+    const lines = String(f.get('options') || '').split('\n').map((line) => line.trim()).filter(Boolean)
+    const options = lines.map((line) => { const [optionID, ...text] = line.split('|'); return { id: optionID.trim(), text: text.join('|').trim() } })
+    let answerKey: unknown
+    try { answerKey = JSON.parse(String(f.get('answer_key') || 'null')) } catch { throw new Error('Answer key must be valid JSON (for example ["A"] or {"value":12,"tolerance":0.5}).') }
+    const selectedSkill = String(f.get('skill_id') || '')
+    await api('/questions', { method: 'POST', body: JSON.stringify({ question_type: type, prompt: { text: f.get('prompt') }, options: type === 'single_choice' || type === 'multiple_choice' ? options : null, answer_key: answerKey, explanation: { text: f.get('explanation') }, difficulty: Number(f.get('difficulty')), language_code: f.get('language_code') || 'en', source_name: f.get('source_name'), source_reference: f.get('source_reference'), license_notes: f.get('license_notes'), skill_tags: selectedSkill ? [{ skill_id: selectedSkill, weight: 1 }] : [] }) })
+    setQuestions(await api<Question[]>('/questions')); form.reset()
+  }
+
+  async function publishQuestion(questionID: string) {
+    await api(`/questions/${questionID}/publish`, { method: 'POST', body: '{}' })
+    setQuestions(await api<Question[]>('/questions'))
   }
 
   if (loading) return <main className="loading">Opening FURII School OS…</main>
@@ -154,6 +218,17 @@ function App() {
         <div className="csv-import"><div><h3>Import historical records</h3><p>Upload a CSV with the required column order. Preview all rows before committing.</p><code>student_number, school_name, academic_year_label, grade_level, subject_name, score, maximum_score, grade_label, source_type</code></div><form onSubmit={(e)=>void previewCSV(e)}><input type="file" name="file" accept=".csv,text/csv" aria-label="Historical records CSV" required/><button className="secondary" disabled={busy}>Preview CSV</button></form></div>
         {importPreview&&<div className="import-preview"><div><strong>Import preview</strong><span>{importPreview.valid_rows} valid · {importPreview.error_rows} rows with errors · {importPreview.status}</span></div>{importPreview.row_errors.map(row=><p className="row-error" key={row.row}>Row {row.row}: {row.errors.join(' ')}</p>)}{importPreview.can_commit&&importPreview.status==='previewed'&&<button className="primary compact" disabled={busy} onClick={()=>void commitCSV()}>Commit {importPreview.valid_rows} records</button>}</div>}
       </>}
+      </section>
+      <section className="panel curriculum-panel" id="curriculum"><div className="panel-head"><div><p className="eyebrow">CURRICULUM & QUESTION BANK</p><h2>Build curriculum-aware practice</h2><p>Add a curriculum version and skill hierarchy, then author reusable questions mapped to specific skills.</p></div><span className="year-icon">⌘</span></div>
+        <div className="curriculum-grid"><div className="curriculum-column"><h3>Curriculum structure</h3>
+          <form className="stack-form curriculum-form" onSubmit={(e)=>void submit(e,()=>createCurriculum(e),'Curriculum version created.')}><strong>New curriculum version</strong><div className="history-fields"><input name="curriculum_name" placeholder="Curriculum name" aria-label="Curriculum name" required/><input name="provider" placeholder="Provider / authority" aria-label="Provider" required/><input name="country_code" placeholder="Country code" aria-label="Country code"/><input name="version_label" placeholder="Version or syllabus year" aria-label="Version label" required/><input name="language_code" placeholder="Language code" aria-label="Language code" defaultValue="en"/><input name="curriculum_source" placeholder="Approved source URL or reference" aria-label="Curriculum source reference"/><input name="curriculum_license" placeholder="License / permission notes" aria-label="Curriculum license notes"/></div><button className="secondary" disabled={busy}>Add curriculum <span>→</span></button></form>
+          {curricula.length>0&&<><label className="student-picker">Curriculum<select value={curriculumID} onChange={(e)=>setCurriculumID(e.target.value)}>{curricula.map(c=><option key={c.id} value={c.id}>{c.name} · {c.provider} · {c.version_label}</option>)}</select></label><form className="inline-form curriculum-form" onSubmit={(e)=>void submit(e,()=>createSubject(e),'Subject added.')}><input name="subject_name" placeholder="Subject name" aria-label="Subject name" required/><input name="grade_level" placeholder="Grade level" aria-label="Grade level"/><input name="subject_code" placeholder="Subject code" aria-label="Subject code"/><button className="secondary" disabled={busy}>Add subject</button></form></>}
+          {subjects.length>0&&<><label className="student-picker">Subject<select value={subjectID} onChange={(e)=>setSubjectID(e.target.value)}>{subjects.map(s=><option key={s.id} value={s.id}>{s.name}{s.grade_level?` · ${s.grade_level}`:''}</option>)}</select></label><form className="stack-form curriculum-form" onSubmit={(e)=>void submit(e,()=>createNode(e),'Curriculum node added.')}><strong>Add topic, concept, skill, or objective</strong><div className="history-fields"><select name="node_type" aria-label="Node type"><option value="unit">Unit</option><option value="topic">Topic</option><option value="concept">Concept</option><option value="skill">Skill</option><option value="objective">Objective</option></select><select name="parent_id" aria-label="Parent node"><option value="">Top-level node</option>{curriculumNodes.map(n=><option key={n.id} value={n.id}>{n.node_type}: {n.title}</option>)}</select><input name="node_title" placeholder="Title" aria-label="Node title" required/><input name="node_code" placeholder="Curriculum code" aria-label="Node code"/><input name="sort_order" type="number" placeholder="Order" aria-label="Sort order" defaultValue="0"/><input name="node_description" placeholder="Description" aria-label="Node description"/></div><button className="secondary" disabled={busy}>Add curriculum node <span>→</span></button></form><div className="curriculum-node-list">{curriculumNodes.map(n=><article key={n.id} className={`node-${n.node_type}`}><span>{n.node_type}</span><strong>{n.title}</strong>{n.code&&<small>{n.code}</small>}</article>)}</div></>}
+          {!curricula.length&&<p className="empty">Start with an approved curriculum definition. Add official content only when its source and usage rights are clear.</p>}
+        </div><div className="curriculum-column"><h3>Question authoring <span>{questions.length}</span></h3>
+          <form className="stack-form question-form" onSubmit={(e)=>void submit(e,()=>createQuestion(e),'Question saved as a draft.')}><select name="question_type" aria-label="Question type"><option value="single_choice">Single choice</option><option value="multiple_choice">Multiple choice</option><option value="numeric">Numeric answer</option><option value="text">Text response</option></select><textarea name="prompt" placeholder="Write the question prompt" aria-label="Question prompt" required rows={3}/><textarea name="options" placeholder={'Choice options, one per line: A|Option text'} aria-label="Choice options" rows={3}/><textarea name="answer_key" placeholder={'Server answer key JSON, e.g. ["A"] or {"value":12,"tolerance":0.5}'} aria-label="Answer key JSON" required rows={2}/><textarea name="explanation" placeholder="Explain the answer for permitted feedback" aria-label="Explanation" rows={2}/><div className="history-fields"><select name="skill_id" aria-label="Tag a curriculum skill"><option value="">Choose a skill tag</option>{curriculumNodes.filter(n=>n.node_type==='skill').map(n=><option key={n.id} value={n.id}>{n.title}</option>)}</select><select name="difficulty" aria-label="Difficulty"><option value="1">Difficulty 1 · introductory</option><option value="2">Difficulty 2</option><option value="3" selected>Difficulty 3 · standard</option><option value="4">Difficulty 4</option><option value="5">Difficulty 5 · advanced</option></select><input name="language_code" placeholder="Language" aria-label="Question language" defaultValue="en"/><input name="source_name" placeholder="Source name" aria-label="Question source" required/><input name="source_reference" placeholder="Source reference" aria-label="Source reference"/><input name="license_notes" placeholder="License / permission" aria-label="License notes" required/></div><p className="form-hint">For choice questions, use unique option IDs such as A and B; the answer key is a JSON array of correct IDs. One selected skill receives weight 1.0000.</p><button className="secondary" disabled={busy||!curriculumNodes.some(n=>n.node_type==='skill')}>Save question draft <span>→</span></button></form>
+          <div className="question-list">{questions.map(q=><article key={q.id}><div className="question-card-head"><span className={`status-pill ${q.status}`}>{q.status}</span><small>{q.question_type.replace('_',' ')} · {q.difficulty===null?'Unrated':`Level ${q.difficulty}`}</small></div><strong>{q.prompt?.text||'Question prompt'}</strong>{q.options?.map(o=><span className="question-option" key={o.id}>{o.id}. {o.text}</span>)}<small>{q.skill_tags.map(t=>`${t.title} (${Number(t.weight).toFixed(2)})`).join(' · ')||'No skill tag yet'}</small>{q.source_name&&<small>Source: {q.source_name}{q.license_notes?` · ${q.license_notes}`:''}</small>}{q.status==='draft'&&<button className="secondary compact" disabled={busy||!q.skill_tags.length} onClick={()=>void submit(new Event('submit') as unknown as FormEvent<HTMLFormElement>,()=>publishQuestion(q.id),'Question published.')}>Publish approved question</button>}</article>)}{!questions.length&&<p className="empty">Your reusable question bank will appear here. Answer keys are never included in these question cards.</p>}</div>
+        </div></div>
       </section>
       <section className="panel settings-panel"><div className="panel-head"><div><h2>School profile</h2><p>Keep your school details and regional settings up to date.</p></div><span className="settings-mark">✳</span></div>
         {school&&<form className="school-form" onSubmit={(e)=>{const form=e.currentTarget;void submit(e,async()=>{const f=new FormData(form);const updated=await api<School>('/school',{method:'PATCH',body:JSON.stringify({name:f.get('name'),timezone:f.get('timezone'),default_language:f.get('default_language')})});setSchool(updated)},'School profile saved.')}}><label>School name<input name="name" defaultValue={school.name} required/></label><label>Timezone<input name="timezone" defaultValue={school.timezone} required/></label><label>Default language<input name="default_language" defaultValue={school.default_language} required/></label><button className="secondary" disabled={busy}>Save profile</button></form>}

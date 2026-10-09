@@ -171,6 +171,102 @@ paths:
       responses:
         '200': { description: Import committed }
         '409': { description: Preview contains errors or has already been committed }
+  /curricula:
+    get:
+      summary: List curriculum versions
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Curriculum definitions and source metadata }
+    post:
+      summary: Create a curriculum version
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Curriculum created }
+  /curricula/{curriculumID}/subjects:
+    parameters:
+      - name: curriculumID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: List subjects in a curriculum version
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Subjects }
+    post:
+      summary: Add a subject and grade to a curriculum version
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Subject created }
+  /subjects/{subjectID}/nodes:
+    parameters:
+      - name: subjectID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Browse curriculum units, topics, concepts, skills, and objectives
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Curriculum hierarchy nodes }
+    post:
+      summary: Add a curriculum hierarchy node
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Node created }
+  /curriculum-mappings:
+    get:
+      summary: List reviewed mappings between curriculum nodes
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Reviewed cross-curriculum mappings }
+  /curriculum-mappings/review:
+    post:
+      summary: Create or update a reviewed mapping between curriculum nodes
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Reviewed mapping saved }
+  /questions:
+    get:
+      summary: List school question-bank content without answer keys
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Questions, source metadata, and skill tags }
+    post:
+      summary: Create a question draft with skill tags
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Draft created }
+  /questions/{questionID}:
+    parameters:
+      - name: questionID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Read a question without its server-side answer key
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Question and tags }
+        '404': { description: Question not found }
+    patch:
+      summary: Replace a draft question and its skill tags
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Draft updated }
+        '409': { description: Only drafts can be changed }
+  /questions/{questionID}/publish:
+    parameters:
+      - name: questionID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      summary: Validate provenance and skill weights, then publish a question
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Question published }
+        '409': { description: Question is missing required publication metadata or tags }
 components:
   securitySchemes:
     sessionCookie:

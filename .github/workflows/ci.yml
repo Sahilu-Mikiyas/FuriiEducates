@@ -97,6 +97,18 @@ jobs:
           job_id=$(jq -er '.data.id' "$RUNNER_TEMP/import-preview.json")
           imported=$(api_request POST "/api/v1/import-jobs/$job_id/commit" '{}')
           if ! echo "$imported" | jq -e '.data.status == "committed" and .data.imported_rows == 1'; then echo "::error title=FURII smoke test::CSV commit failed: $imported"; exit 1; fi
+          curriculum=$(api_request POST "/api/v1/curricula" '{"name":"Ethiopian Curriculum","provider":"Ministry of Education","country_code":"ET","version_label":"CI","language_code":"en","source_reference":"CI fixture","license_notes":"CI only"}')
+          curriculum_id=$(echo "$curriculum" | jq -er '.data.id')
+          subject=$(api_request POST "/api/v1/curricula/$curriculum_id/subjects" '{"name":"Mathematics","grade_level":"8","subject_code":"MATH-8"}')
+          subject_id=$(echo "$subject" | jq -er '.data.id')
+          skill=$(api_request POST "/api/v1/subjects/$subject_id/nodes" '{"node_type":"skill","title":"Add fractions","code":"M8.1"}')
+          skill_id=$(echo "$skill" | jq -er '.data.id')
+          question=$(api_request POST "/api/v1/questions" "{\"question_type\":\"single_choice\",\"prompt\":{\"text\":\"What is 1/2 + 1/4?\"},\"options\":[{\"id\":\"A\",\"text\":\"3/4\"},{\"id\":\"B\",\"text\":\"2/6\"}],\"answer_key\":[\"A\"],\"difficulty\":2,\"language_code\":\"en\",\"source_name\":\"CI fixture\",\"source_reference\":\"CI only\",\"license_notes\":\"CI fixture, not for distribution\",\"skill_tags\":[{\"skill_id\":\"$skill_id\",\"weight\":1}]}" )
+          question_id=$(echo "$question" | jq -er '.data.id')
+          published=$(api_request POST "/api/v1/questions/$question_id/publish" '{}')
+          if ! echo "$published" | jq -e '.data.status == "published"'; then echo "::error title=FURII smoke test::Question did not publish: $published"; exit 1; fi
+          question_bank=$(api_request GET "/api/v1/questions")
+          if ! echo "$question_bank" | jq -e --arg id "$question_id" 'any(.data[]; .id == $id and .status == "published" and (has("answer_key") | not) and .skill_tags[0].title == "Add fractions")'; then echo "::error title=FURII smoke test::Published question is missing or answer key was exposed: $question_bank"; exit 1; fi
       - name: Build web application
         working-directory: apps/web
         run: npm ci && npm run build

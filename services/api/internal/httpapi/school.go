@@ -47,6 +47,7 @@ func hasRole(roles []string, expected string) bool {
 
 func (a *API) registerSchoolRoutes(mux *http.ServeMux) {
 	a.registerAcademicRoutes(mux)
+	a.registerCurriculumRoutes(mux)
 	mux.HandleFunc("GET /api/v1/school", a.admin(a.getSchool))
 	mux.HandleFunc("PATCH /api/v1/school", a.admin(a.updateSchool))
 	mux.HandleFunc("GET /api/v1/academic-years", a.admin(a.listAcademicYears))
