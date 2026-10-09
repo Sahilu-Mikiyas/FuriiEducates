@@ -1,0 +1,110 @@
+openapi: 3.1.0
+info:
+  title: FURII School OS API
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /auth/login:
+    post:
+      summary: Create an authenticated session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 1 }
+      responses:
+        '200': { description: Authenticated; sets an HttpOnly session cookie }
+        '400': { description: Invalid request }
+        '401': { description: Invalid credentials }
+  /auth/logout:
+    post:
+      summary: Revoke the current session
+      responses:
+        '200': { description: Session revoked }
+  /me:
+    get:
+      summary: Get the current identity and roles
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Current user }
+        '401': { description: Authentication required }
+  /healthz:
+    get:
+      summary: API and database health
+      responses:
+        '200': { description: Healthy }
+        '503': { description: Dependency unavailable }
+  /school:
+    get:
+      summary: Read the current school profile
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: School profile }
+    patch:
+      summary: Update school settings
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Updated school profile }
+  /academic-years:
+    get:
+      summary: List academic years for the current school
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Academic years }
+    post:
+      summary: Create an academic year
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Academic year created }
+  /classes:
+    get:
+      summary: List classes for the current school
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Classes }
+    post:
+      summary: Create a class in an academic year
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Class created }
+  /students:
+    get:
+      summary: List students in the current school
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Students }
+    post:
+      summary: Create a student and optionally enroll in a class
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Student created }
+  /students/{studentID}:
+    parameters:
+      - name: studentID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Read a student in the current school
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Student }
+        '404': { description: Student not found }
+    patch:
+      summary: Update a student's permitted profile fields
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Updated student }
+        '404': { description: Student not found }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: furii_session
