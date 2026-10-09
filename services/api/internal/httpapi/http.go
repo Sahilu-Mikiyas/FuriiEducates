@@ -5,6 +5,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -15,22 +17,71 @@ import (
 const cookieName = "furii_session"
 
 type API struct {
-	auth   *auth.Service
-	db     *pgxpool.Pool
-	secure bool
-	ttl    time.Duration
-	log    *slog.Logger
+	auth           *auth.Service
+	db             *pgxpool.Pool
+	secure         bool
+	ttl            time.Duration
+	log            *slog.Logger
+	allowedOrigins []string
 }
 
 func New(a *auth.Service, db *pgxpool.Pool, secure bool, ttl time.Duration, log *slog.Logger) http.Handler {
-	x := &API{auth: a, db: db, secure: secure, ttl: ttl, log: log}
+	var allowedOrigins []string
+	for _, origin := range strings.Split(os.Getenv("CORS_ALLOWED_ORIGINS"), ",") {
+		if origin = strings.TrimSpace(origin); origin != "" {
+			allowedOrigins = append(allowedOrigins, origin)
+		}
+	}
+	x := &API{auth: a, db: db, secure: secure, ttl: ttl, log: log, allowedOrigins: allowedOrigins}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", x.health)
 	mux.HandleFunc("POST /api/v1/auth/login", x.login)
 	mux.HandleFunc("POST /api/v1/auth/logout", x.logout)
 	mux.HandleFunc("GET /api/v1/me", x.me)
 	x.registerSchoolRoutes(mux)
-	return mux
+	return x.cors(mux)
+}
+
+func (a *API) cors(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		parsedOrigin, err := url.Parse(origin)
+		allowed := err == nil && strings.EqualFold(parsedOrigin.Host, r.Host)
+		for _, candidate := range a.allowedOrigins {
+			if origin == candidate {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			writeError(w, http.StatusForbidden, "ORIGIN_NOT_ALLOWED", "This web origin is not allowed to access the school API.", nil)
+			return
+		}
+
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Vary", "Origin")
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.Header().Set("Access-Control-Max-Age", "600")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (a *API) cookieSameSite() http.SameSite {
+	if a.secure {
+		return http.SameSiteNoneMode
+	}
+	return http.SameSiteLaxMode
 }
 
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +111,7 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	seconds := int(a.ttl.Seconds())
-	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: token, Path: "/", HttpOnly: true, Secure: a.secure, SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(a.ttl), MaxAge: seconds})
+	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: token, Path: "/", HttpOnly: true, Secure: a.secure, SameSite: a.cookieSameSite(), Expires: time.Now().Add(a.ttl), MaxAge: seconds})
 	writeJSON(w, 200, map[string]any{"data": identity})
 }
 
@@ -71,7 +122,7 @@ func (a *API) logout(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", HttpOnly: true, Secure: a.secure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", HttpOnly: true, Secure: a.secure, SameSite: a.cookieSameSite(), MaxAge: -1})
 	writeJSON(w, 200, map[string]any{"data": map[string]bool{"logged_out": true}})
 }
 

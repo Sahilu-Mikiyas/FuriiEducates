@@ -15,15 +15,30 @@ type Subject = { id: string; name: string; grade_level: string; subject_code: st
 type CurriculumNode = { id: string; parent_id: string; node_type: string; code: string; title: string; description: string; sort_order: number }
 type Question = { id: string; question_type: string; prompt: { text?: string }; options: { id: string; text: string }[] | null; explanation: { text?: string } | null; difficulty: number | null; language_code: string; source_name: string; source_reference: string; license_notes: string; status: string; skill_tags: { skill_id: string; title: string; weight: number }[] }
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '')
+const apiURL = (path: string) => `${API_BASE_URL}/api/v1${path}`
+
+async function readAPIResponse(response: Response) {
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+  if (!contentType.includes('json')) {
+    throw new Error(`The school API returned a non-JSON page (HTTP ${response.status}). The Vercel frontend is not connected to the Go API yet. Deploy the API, set VITE_API_BASE_URL to its HTTPS URL, and redeploy the frontend.`)
+  }
+  try {
+    return await response.json()
+  } catch {
+    throw new Error('The school API returned invalid JSON. Check the API deployment and its logs.')
+  }
+}
+
 const api = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const headers = new Headers(init?.headers)
   headers.set('Content-Type', 'application/json')
-  const response = await fetch(`/api/v1${path}`, {
+  const response = await fetch(apiURL(path), {
     ...init,
     credentials: 'include',
     headers,
   })
-  const body = await response.json()
+  const body = await readAPIResponse(response)
   if (!response.ok) throw new Error(body?.error?.message ?? 'The request could not be completed.')
   return body.data as T
 }
@@ -117,8 +132,8 @@ function App() {
     const file = (new FormData(form).get('file')) as File | null
     if (!file || file.size === 0) { setError('Choose a CSV file to preview.'); setBusy(false); return }
     try {
-      const response = await fetch('/api/v1/import-jobs/preview', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'text/csv' }, body: await file.text() })
-      const body = await response.json()
+      const response = await fetch(apiURL('/import-jobs/preview'), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'text/csv' }, body: await file.text() })
+      const body = await readAPIResponse(response)
       if (!response.ok) throw new Error(body?.error?.message ?? 'Could not preview this CSV.')
       setImportPreview(body.data as ImportPreview)
       setNotice('Import preview ready. Review every row before committing.')

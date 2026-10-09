@@ -23,6 +23,10 @@ Requirements: Go 1.23+, Node.js 20+, npm, and Docker Compose.
 
 The API exposes health and authentication endpoints plus administrator workflows for school settings, academic years, classes, students, historical academic records, external examinations, curriculum versions, subject skill trees, and a reusable question bank. Academic history CSV uploads are previewed with row-level validation before a single atomic commit. Questions support single choice, multiple choice, numeric, and text answer types; publishing requires source and licensing notes plus skill-tag weights that sum to 1. Answer keys remain server-side and are omitted from question responses. Add only curriculum content approved for use by your school. Provision the first school administrator once with `BOOTSTRAP_SCHOOL_NAME`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_NAME`, and `BOOTSTRAP_ADMIN_PASSWORD` set in the environment, then run `go run ./cmd/bootstrap` from `services/api`. The bootstrap command refuses to run after a school exists, and public signup is not enabled. Production deployments must use HTTPS, set `COOKIE_SECURE=true`, restrict database access, and protect backups and secrets.
 
+## Production web and API connection
+
+The Vercel deployment serves the Vite frontend; it does not run this Go API automatically. Deploy `services/api` as a separate HTTPS web service connected to Supabase, then set `VITE_API_BASE_URL` in the Vercel project to that service's origin (for example, `https://school-api.example.com`) and redeploy the frontend. Do not use the Supabase project URL or anon key as the API URL. On the API service, set `CORS_ALLOWED_ORIGINS` to the exact Vercel frontend origin, enable `COOKIE_SECURE=true`, and keep `DATABASE_URL` and `SESSION_HASH_KEY` as server-side secrets. Verify the API by opening its `/healthz` endpoint; it should return JSON with status `ok`.
+
 ## Engineering principles
 
 PostgreSQL is authoritative. The Go API is a modular monolith. Authentication uses opaque, revocable server-side sessions and secure cookies. Authorization is enforced in the API and scoped to school records. Student-facing APIs must never expose question answer keys.
