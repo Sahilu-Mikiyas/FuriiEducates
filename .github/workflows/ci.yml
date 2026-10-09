@@ -59,31 +59,29 @@ jobs:
             if curl --fail --silent http://localhost:8080/healthz >/dev/null; then break; fi
             sleep 1
           done
-          if ! curl --fail --silent http://localhost:8080/healthz >/dev/null; then cat "$RUNNER_TEMP/furii-api.log"; exit 1; fi
-          login_status=$(curl --silent --show-error -w '%{http_code}' -o "$RUNNER_TEMP/login.json" -c "$RUNNER_TEMP/cookies.txt" \
-            -H 'Content-Type: application/json' \
-            -d '{"email":"admin@example.test","password":"ci-test-password-long-enough"}' \
-            http://localhost:8080/api/v1/auth/login)
-          if [ "$login_status" != "200" ]; then cat "$RUNNER_TEMP/login.json"; echo "Login returned HTTP $login_status"; exit 1; fi
-          curl --fail --silent --show-error -b "$RUNNER_TEMP/cookies.txt" \
-            http://localhost:8080/api/v1/school | jq -e '.data.name == "FURII CI School"'
-          year=$(curl --fail --silent --show-error -b "$RUNNER_TEMP/cookies.txt" \
-            -H 'Content-Type: application/json' \
-            -d '{"name":"2026-2027","starts_on":"2026-09-01","ends_on":"2027-07-01"}' \
-            http://localhost:8080/api/v1/academic-years)
+          if ! curl --fail --silent http://localhost:8080/healthz >/dev/null; then cat "$RUNNER_TEMP/furii-api.log"; echo '::error title=FURII smoke test::API health check failed'; exit 1; fi
+          api_request() {
+            method="$1"; path="$2"; payload="${3:-}"
+            if [ -n "$payload" ]; then
+              status=$(curl --silent --show-error -o "$RUNNER_TEMP/response.json" -w '%{http_code}' -b "$RUNNER_TEMP/cookies.txt" -c "$RUNNER_TEMP/cookies.txt" -X "$method" -H 'Content-Type: application/json' -d "$payload" "http://localhost:8080$path")
+            else
+              status=$(curl --silent --show-error -o "$RUNNER_TEMP/response.json" -w '%{http_code}' -b "$RUNNER_TEMP/cookies.txt" "http://localhost:8080$path")
+            fi
+            case "$status" in 2*) cat "$RUNNER_TEMP/response.json" ;; *) body=$(cat "$RUNNER_TEMP/response.json"); echo "::error title=FURII smoke test::$method $path returned HTTP $status: $body"; return 1 ;; esac
+          }
+          login=$(curl --silent --show-error -o "$RUNNER_TEMP/login.json" -w '%{http_code}' -c "$RUNNER_TEMP/cookies.txt" \
+            -H 'Content-Type: application/json' -d '{"email":"admin@example.test","password":"ci-test-password-long-enough"}' http://localhost:8080/api/v1/auth/login)
+          if [ "$login" != "200" ]; then body=$(cat "$RUNNER_TEMP/login.json"); echo "::error title=FURII smoke test::POST /api/v1/auth/login returned HTTP $login: $body"; exit 1; fi
+          school=$(api_request GET /api/v1/school)
+          echo "$school" | jq -e '.data.name == "FURII CI School"'
+          year=$(api_request POST /api/v1/academic-years '{"name":"2026-2027","starts_on":"2026-09-01","ends_on":"2027-07-01"}')
           year_id=$(echo "$year" | jq -er '.data.id')
-          class=$(curl --fail --silent --show-error -b "$RUNNER_TEMP/cookies.txt" \
-            -H 'Content-Type: application/json' \
-            -d "{\"name\":\"Section A\",\"grade_level\":\"9\",\"academic_year_id\":\"$year_id\"}" \
-            http://localhost:8080/api/v1/classes)
+          class=$(api_request POST /api/v1/classes "{\"name\":\"Section A\",\"grade_level\":\"9\",\"academic_year_id\":\"$year_id\"}")
           class_id=$(echo "$class" | jq -er '.data.id')
-          student=$(curl --fail --silent --show-error -b "$RUNNER_TEMP/cookies.txt" \
-            -H 'Content-Type: application/json' \
-            -d "{\"student_number\":\"CI-001\",\"legal_name\":\"Test Learner\",\"class_id\":\"$class_id\"}" \
-            http://localhost:8080/api/v1/students)
+          student=$(api_request POST /api/v1/students "{\"student_number\":\"CI-001\",\"legal_name\":\"Test Learner\",\"class_id\":\"$class_id\"}")
           student_id=$(echo "$student" | jq -er '.data.id')
-          curl --fail --silent --show-error -b "$RUNNER_TEMP/cookies.txt" \
-            "http://localhost:8080/api/v1/students/$student_id" | jq -e '.data.legal_name == "Test Learner"'
+          fetched=$(api_request GET "/api/v1/students/$student_id")
+          echo "$fetched" | jq -e '.data.legal_name == "Test Learner"'
       - name: Build web application
         working-directory: apps/web
         run: npm ci && npm run build
