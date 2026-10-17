@@ -51,6 +51,25 @@ paths:
       security: [{ sessionCookie: [] }]
       responses:
         '200': { description: Updated school profile }
+  /school/learning-summary:
+    get:
+      summary: Read school-scoped assessment and intervention summary
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Assessment completion, average objective score, and active recommendations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      assigned_assessments: { type: integer }
+                      submitted_attempts: { type: integer }
+                      average_score_percent: { type: number }
+                      active_recommendations: { type: integer }
   /academic-years:
     get:
       summary: List academic years for the current school
@@ -267,6 +286,271 @@ paths:
       responses:
         '200': { description: Question published }
         '409': { description: Question is missing required publication metadata or tags }
+  /assessments:
+    get:
+      summary: List school assessments with question and class assignments
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Assessments scoped to the current school }
+    post:
+      summary: Create a draft assessment from published school questions
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, duration_minutes, question_ids]
+              properties:
+                title: { type: string, minLength: 1, maxLength: 200 }
+                instructions: { type: string, maxLength: 5000 }
+                duration_minutes: { type: integer, minimum: 5, maximum: 240 }
+                question_ids:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items: { type: string, format: uuid }
+      responses:
+        '201': { description: Draft assessment created }
+        '400': { description: Invalid request or question is not published in this school }
+  /assessments/{assessmentID}/publish:
+    parameters:
+      - name: assessmentID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      summary: Publish a non-empty draft assessment
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Assessment published }
+        '404': { description: Assessment not found }
+        '409': { description: Assessment cannot be published }
+  /assessments/{assessmentID}/assignments:
+    parameters:
+      - name: assessmentID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      summary: Assign a published assessment to a class in the current school
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [class_id]
+              properties:
+                class_id: { type: string, format: uuid }
+      responses:
+        '201': { description: Assessment assigned to the class }
+        '404': { description: Assessment or class not found }
+        '409': { description: Assessment is unpublished or already assigned }
+  /students/{studentID}/invitation:
+    parameters:
+      - name: studentID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      summary: Create a one-time account invitation for an active student
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '201': { description: Student activation token; return only once }
+        '404': { description: Student not found }
+  /student-invitations/accept:
+    post:
+      summary: Accept a one-time student account invitation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, display_name, password]
+              properties:
+                token: { type: string }
+                display_name: { type: string, minLength: 1, maxLength: 200 }
+                password: { type: string, minLength: 12 }
+      responses:
+        '201': { description: Student account activated }
+        '400': { description: Invalid or expired invitation }
+  /student/assessments:
+    get:
+      summary: List published assessments assigned to the current student's active classes
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Assigned assessments and attempt status }
+  /student/assessments/{assignmentID}:
+    parameters:
+      - name: assignmentID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Read the assigned assessment without server-side answer keys
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Assessment and learner-facing questions }
+        '404': { description: Assessment is not assigned to an active class }
+  /student/assessments/{assignmentID}/start:
+    parameters:
+      - name: assignmentID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      summary: Start or resume the student's single attempt
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Attempt created or resumed }
+  /student/attempts/{attemptID}/answers/{questionID}:
+    parameters:
+      - name: attemptID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: questionID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      summary: Save an answer on the student's in-progress attempt
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [answer, revision, idempotency_key, flagged]
+              properties:
+                answer: {}
+                revision: { type: integer, minimum: 0 }
+                idempotency_key: { type: string, format: uuid }
+                flagged: { type: boolean }
+      responses:
+        '200': { description: Answer saved }
+        '404': { description: Attempt or question not found }
+        '409': { description: Attempt submitted, deadline passed, or stale answer revision }
+  /student/attempts/{attemptID}/submit:
+    parameters:
+      - name: attemptID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      summary: Submit answers for server-side automatic grading
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [answers]
+              properties:
+                answers: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Submission received and objective items graded }
+        '409': { description: Attempt was already submitted }
+  /teacher/reviews:
+    get:
+      summary: List unanswered written response reviews for an assigned class
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - name: class_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Pending written responses with prompts and grading guides }
+        '403': { description: Teacher is not assigned to the class }
+  /teacher/attempts/{attemptID}/answers/{questionID}:
+    parameters:
+      - name: attemptID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: questionID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      summary: Grade a written response from a submitted attempt
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [points]
+              properties:
+                points: { type: number, minimum: 0 }
+                feedback: { type: string, maxLength: 5000 }
+      responses:
+        '200': { description: Grade saved; final result released when all written answers are reviewed }
+        '400': { description: Score is outside the question's point range }
+        '403': { description: Teacher is not assigned to the class }
+        '404': { description: Attempt or written answer not found }
+        '409': { description: Attempt is not submitted }
+  /student/learning-profile:
+    get:
+      summary: Get the current student's skill mastery estimates and recommendations
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Skill estimates include evidence counts, confidence bands, and algorithm version }
+  /student/recommendations/{recommendationID}/accept:
+    parameters:
+      - name: recommendationID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      summary: Accept a recommendation owned by the current student
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Recommendation accepted }
+        '404': { description: Recommendation not found }
+        '409': { description: Recommendation is not pending }
+  /student/recommendations/{recommendationID}/complete:
+    parameters:
+      - name: recommendationID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      summary: Mark an accepted recommendation's learning activity complete
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Completion recorded for later reassessment comparison }
+        '404': { description: Recommendation not found }
+        '409': { description: Recommendation must be accepted first }
+  /teacher/classes/{classID}/learning-profile:
+    parameters:
+      - name: classID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: View skill evidence and active recommendation counts for an assigned class
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Class-scoped learner skill evidence }
+        '403': { description: Teacher is not assigned to the class }
 components:
   securitySchemes:
     sessionCookie:

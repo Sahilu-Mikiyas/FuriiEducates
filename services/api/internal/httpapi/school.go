@@ -48,7 +48,13 @@ func hasRole(roles []string, expected string) bool {
 func (a *API) registerSchoolRoutes(mux *http.ServeMux) {
 	a.registerAcademicRoutes(mux)
 	a.registerCurriculumRoutes(mux)
+	a.registerStaffRoutes(mux)
+	a.registerAssessmentRoutes(mux)
+	a.registerLearnerRoutes(mux)
+	a.registerReviewRoutes(mux)
+	a.registerIntelligenceRoutes(mux)
 	mux.HandleFunc("GET /api/v1/school", a.admin(a.getSchool))
+	mux.HandleFunc("GET /api/v1/school/learning-summary", a.admin(a.getSchoolLearningSummary))
 	mux.HandleFunc("PATCH /api/v1/school", a.admin(a.updateSchool))
 	mux.HandleFunc("GET /api/v1/academic-years", a.admin(a.listAcademicYears))
 	mux.HandleFunc("POST /api/v1/academic-years", a.admin(a.createAcademicYear))
@@ -58,6 +64,27 @@ func (a *API) registerSchoolRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/students", a.admin(a.createStudent))
 	mux.HandleFunc("GET /api/v1/students/{studentID}", a.admin(a.getStudent))
 	mux.HandleFunc("PATCH /api/v1/students/{studentID}", a.admin(a.updateStudent))
+}
+
+func (a *API) getSchoolLearningSummary(w http.ResponseWriter, r *http.Request, id auth.Identity) {
+	var summary struct {
+		AssignedAssessments   int     `json:"assigned_assessments"`
+		SubmittedAttempts     int     `json:"submitted_attempts"`
+		AverageScorePercent   float64 `json:"average_score_percent"`
+		ActiveRecommendations int     `json:"active_recommendations"`
+	}
+	err := a.db.QueryRow(r.Context(), `
+		SELECT
+			(SELECT count(*)::int FROM assessment_assignments WHERE school_id=$1),
+			(SELECT count(*)::int FROM assessment_attempts WHERE school_id=$1 AND status='submitted'),
+			COALESCE((SELECT round(avg(100.0 * score / NULLIF(max_score,0)),1)::float8 FROM assessment_attempts WHERE school_id=$1 AND status='submitted' AND max_score>0),0),
+			(SELECT count(*)::int FROM recommendations WHERE school_id=$1 AND status IN ('pending','accepted','in_progress'))`, id.SchoolID).Scan(
+		&summary.AssignedAssessments, &summary.SubmittedAttempts, &summary.AverageScorePercent, &summary.ActiveRecommendations)
+	if err != nil {
+		a.databaseError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": summary})
 }
 
 func (a *API) getSchool(w http.ResponseWriter, r *http.Request, id auth.Identity) {
@@ -227,20 +254,21 @@ func (a *API) createClass(w http.ResponseWriter, r *http.Request, id auth.Identi
 }
 
 func (a *API) listStudents(w http.ResponseWriter, r *http.Request, id auth.Identity) {
-	rows, err := a.db.Query(r.Context(), `SELECT s.id::text,s.student_number,s.legal_name,COALESCE(s.preferred_language,''),s.status FROM students s WHERE s.school_id=$1 ORDER BY s.legal_name,s.student_number LIMIT 200`, id.SchoolID)
+	rows, err := a.db.Query(r.Context(), `SELECT s.id::text,s.student_number,s.legal_name,COALESCE(s.preferred_language,''),s.status,(s.user_id IS NOT NULL) FROM students s WHERE s.school_id=$1 ORDER BY s.legal_name,s.student_number LIMIT 200`, id.SchoolID)
 	if err != nil {
 		a.serverError(w, r, err)
 		return
 	}
 	defer rows.Close()
-	items := []map[string]string{}
+	items := []map[string]any{}
 	for rows.Next() {
 		var x [5]string
-		if err := rows.Scan(&x[0], &x[1], &x[2], &x[3], &x[4]); err != nil {
+		var hasAccount bool
+		if err := rows.Scan(&x[0], &x[1], &x[2], &x[3], &x[4], &hasAccount); err != nil {
 			a.serverError(w, r, err)
 			return
 		}
-		items = append(items, map[string]string{"id": x[0], "student_number": x[1], "legal_name": x[2], "preferred_language": x[3], "status": x[4]})
+		items = append(items, map[string]any{"id": x[0], "student_number": x[1], "legal_name": x[2], "preferred_language": x[3], "status": x[4], "has_account": hasAccount})
 	}
 	if err := rows.Err(); err != nil {
 		a.serverError(w, r, err)
