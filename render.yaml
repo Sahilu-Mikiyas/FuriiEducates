@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: furii-school-api
+    runtime: go
+    plan: free
+    rootDir: services/api
+    buildCommand: go build -tags netgo -ldflags '-s -w' -o app ./cmd/api
+    startCommand: ./app
+    healthCheckPath: /healthz
+    envVars:
+      - key: HTTP_ADDR
+        value: :10000
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: SESSION_TTL
+        value: 12h
+      - key: SESSION_HASH_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false

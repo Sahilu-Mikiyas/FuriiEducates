@@ -25,7 +25,7 @@ The API exposes health and authentication endpoints plus administrator workflows
 
 ## Production web and API connection
 
-The Vercel deployment serves the Vite frontend; it does not run this Go API automatically. Deploy `services/api` as a separate HTTPS web service connected to Supabase, then set `VITE_API_BASE_URL` in the Vercel project to that service's origin (for example, `https://school-api.example.com`) and redeploy the frontend. Do not use the Supabase project URL or anon key as the API URL. On the API service, set `CORS_ALLOWED_ORIGINS` to the exact Vercel frontend origin, enable `COOKIE_SECURE=true`, and keep `DATABASE_URL` and `SESSION_HASH_KEY` as server-side secrets. Verify the API by opening its `/healthz` endpoint; it should return JSON with status `ok`.
+The Vercel deployment serves the Vite frontend; it does not run this Go API automatically. The root `render.yaml` prepares a small Render web service for `services/api`. Create it from this repository in Render and provide the Supabase `DATABASE_URL` and exact Vercel frontend origin when prompted. After the API deploys, set `VITE_API_BASE_URL` in the Vercel project to the API's `onrender.com` origin and redeploy the frontend. Do not use the Supabase project URL or anon key as the API URL. The Blueprint generates `SESSION_HASH_KEY`, enables HTTPS cookies, and probes `/healthz`. Render's Free web services sleep after 15 minutes without requests and can take about a minute to wake; use a paid instance for production availability.
 
 ## Engineering principles
 
