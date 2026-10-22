@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -264,5 +263,3 @@ func baselineVerifiedSupabaseMigrations(ctx context.Context, conn *pgxpool.Conn)
 	return nil
 }
 
-// Ensure the compile-time pgx interface stays explicit when pgx releases change.
-var _ pgx.Tx
