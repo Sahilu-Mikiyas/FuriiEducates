@@ -193,7 +193,7 @@
 .faq-list details[open] summary span{transform:rotate(45deg)}
 .faq-list details p{max-width:780px;padding:0 35px 20px 0;margin:0;color:#717680;font-size:11px;line-height:1.8}
 .landing-final{min-height:365px;position:relative;overflow:hidden;padding:80px 8%;background:#111318;color:#fff}
-.landing-final>div:first-of-type:not(.final-orbit){position:relative;z-index:1}
+.landing-final .landing-reveal{position:relative;z-index:1}
 .landing-final .landing-kicker{color:#9bb0ff}
 .landing-final h2{font-size:clamp(38px,5vw,62px);line-height:1.05;letter-spacing:-.07em;margin:0 0 14px}
 .landing-final>div>p:not(.landing-kicker){color:#b5b8c0;font-size:12px}
