@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import './marketing.css'
 
 const views = [
@@ -62,7 +62,7 @@ const scaleSteps = [
   { label: 'Keep the picture connected', title: 'A busy school', text: 'Give leaders, teachers, and learners focused workspaces while school records stay together.' },
 ]
 
-function Reveal({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+function Reveal({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <div className={`landing-reveal ${className}`}>{children}</div>
 }
 
