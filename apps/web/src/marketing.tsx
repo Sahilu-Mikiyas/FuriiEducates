@@ -119,7 +119,7 @@ export function MarketingLanding() {
           <div className="floating-note note-skill"><span className="note-icon lime">✳</span><span><strong>Learning evidence</strong><small>Connected to curriculum skills</small></span></div>
           <div className="hero-product">
             <div className="product-topline"><span className="product-logo">F</span><span className="product-school">FURII SCHOOL OS<small>LEARNING WORKSPACE</small></span><span className="product-dots">•••</span></div>
-            <div className="product-welcome"><small>MONDAY · SCHOOL OVERVIEW</small><strong>Good morning, team.</strong><span>Here’s what’s moving across your school.</span></div>
+            <div className="product-welcome"><small>SAMPLE WORKSPACE · SCHOOL OVERVIEW</small><strong>Good morning, team.</strong><span>Here’s what’s moving across your school.</span></div>
             <div className="product-metrics"><div><small>LEARNERS</small><strong>642</strong><i>Across 24 classes</i></div><div><small>ASSESSMENTS</small><strong>08</strong><i>Active this week</i></div></div>
             <div className="product-learning">
               <div className="learning-head"><span><b>Learning evidence</b><small>Progress across your classes</small></span><span className="learning-arrow">↗</span></div>
