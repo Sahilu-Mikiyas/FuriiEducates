@@ -2,6 +2,7 @@ import { FormEvent, MouseEvent, useCallback, useEffect, useRef, useState } from 
 import { createRoot } from 'react-dom/client'
 import { clearPendingAnswers, listPendingAnswers, removePendingAnswer, savePendingAnswer } from './offlineAnswers'
 import './style.css'
+import { MarketingLanding } from './marketing'
 
 type Identity = { user_id: string; school_id: string; display_name: string; roles: string[] }
 type School = { id: string; name: string; timezone: string; default_language: string }
@@ -104,7 +105,7 @@ function App() {
   const [studentInviteLinks, setStudentInviteLinks] = useState<Record<string,string>>({})
   const [curriculumID, setCurriculumID] = useState('')
   const [subjectID, setSubjectID] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => window.location.pathname !== '/')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -126,7 +127,7 @@ function App() {
 
   useEffect(() => {
     if (!identity?.roles.includes('school_admin')) return
-    if (window.location.pathname === '/') window.history.replaceState({}, '', '/admin/overview')
+    if (window.location.pathname === '/' || window.location.pathname === '/login') window.history.replaceState({}, '', '/admin/overview')
   }, [identity])
 
   const refresh = useCallback(async () => {
@@ -344,6 +345,7 @@ function App() {
   if (loading) return <main className="loading">Opening FURII School OS…</main>
   if (identity?.roles.includes('student')) return <LearnerWorkspace identity={identity} initialAssignments={learnerAssignments} onLogout={() => void logout()} />
   if (identity?.roles.includes('teacher')) return <TeacherWorkspace identity={identity} classes={teacherClasses} onLogout={() => void logout()} />
+  if (!identity && window.location.pathname === '/') return <MarketingLanding />
   if (!identity) return <main className="login-shell">
     <div className="login-art"><Brand /><div className="login-copy"><p className="eyebrow">A SCHOOL THAT SEES EVERY LEARNER</p><h1>Build a stronger<br />academic foundation.</h1><p>Bring your school records, teaching, and assessment into one connected place.</p><div className="art-orbit orbit-one"/><div className="art-orbit orbit-two"/><div className="art-spark">✳</div></div><span className="login-footnote">FURII SCHOOL OS <span>·</span> MADE FOR LEARNING</span></div>
     <div className="login-pane"><form className="login-form" onSubmit={(e) => void submit(e, () => login(e), 'Welcome back.')}>
