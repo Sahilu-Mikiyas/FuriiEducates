@@ -12,6 +12,7 @@ import (
 	"github.com/furii/school-os/services/api/internal/auth"
 	"github.com/furii/school-os/services/api/internal/config"
 	"github.com/furii/school-os/services/api/internal/httpapi"
+	"github.com/furii/school-os/services/api/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
