@@ -139,7 +139,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (invitationToken || studentInvitationToken) { setLoading(false); return }
+    if (invitationToken || studentInvitationToken || window.location.pathname === '/') { setLoading(false); return }
     api<Identity>('/me').then(async (user) => { setIdentity(user); if (user.roles.includes('school_admin')) await refresh() })
       .catch(() => setIdentity(null)).finally(() => setLoading(false))
   }, [refresh, invitationToken, studentInvitationToken])
