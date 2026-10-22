@@ -27,10 +27,13 @@ School administrators can invite teachers and learners using single-use, seven-d
 
 ## Production web and API connection
 
-The Vercel deployment serves the Vite frontend; it does not run this Go API automatically. The root `render.yaml` prepares a small Render web service for `services/api`. Create it from this repository in Render and provide the Supabase `DATABASE_URL` and exact Vercel frontend origin when prompted. After the API deploys, set `VITE_API_BASE_URL` in the Vercel project to the API's `onrender.com` origin and redeploy the frontend. Do not use the Supabase project URL or anon key as the API URL. The Blueprint generates `SESSION_HASH_KEY`, enables HTTPS cookies, and probes `/healthz`. Render's Free web services sleep after 15 minutes without requests and can take about a minute to wake; use a paid instance for production availability.
+The Vercel deployment serves the Vite frontend; it does not run this Go API automatically. The root `render.yaml` prepares a small Render web service for `services/api`. Create it from this repository in Render and provide the Supabase `DATABASE_URL` and exact Vercel frontend origin when prompted. In Vercel, set `VITE_API_BASE_URL` to `https://furii-school-api.onrender.com` (the API origin only, with no `/api/v1`) in every environment you use, then redeploy. For local Vite development, leave `VITE_API_BASE_URL` empty to use the `/api` proxy; the local example is in `apps/web/.env.example`. Do not use the Supabase project URL or anon key as the API URL. The Blueprint generates `SESSION_HASH_KEY`, enables HTTPS cookies, and probes `/healthz`. Render's Free web services sleep after 15 minutes without requests and can take about a minute to wake; use a paid instance for production availability.
+
+The administrator workspace uses focused pages at `/admin/overview`, `/admin/students`, `/admin/classes`, `/admin/academic-passport`, `/admin/curriculum`, `/admin/assessments`, `/admin/staff`, and `/admin/settings`. Vercel rewrites those paths to the Vite app so they also load directly and survive a browser refresh.
 
 Before using real student data, complete the [Phase 1 pilot-readiness checklist](docs/phase-1-pilot-readiness.md).
 
 ## Engineering principles
 
 PostgreSQL is authoritative. The Go API is a modular monolith. Authentication uses opaque, revocable server-side sessions and secure cookies. Authorization is enforced in the API and scoped to school records. Student-facing APIs must never expose question answer keys.
+
