@@ -255,10 +255,18 @@ func baselineVerifiedSupabaseMigrations(ctx context.Context, conn *pgxpool.Conn)
 		return fmt.Errorf("Supabase migration records exist but security checks failed (tables without RLS: %d, API role grants: %d); refusing to baseline", unsecuredTables, grantedTables)
 	}
 
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin verified migration baseline: %w", err)
+	}
 	for version := int64(4); version <= 10; version++ {
-		if _, err := conn.Exec(ctx, "INSERT INTO public.goose_db_version (version_id, is_applied) VALUES ($1, true)", version); err != nil {
+		if _, err := tx.Exec(ctx, "INSERT INTO public.goose_db_version (version_id, is_applied) VALUES ($1, true)", version); err != nil {
+			_ = tx.Rollback(context.Background())
 			return fmt.Errorf("baseline verified migration version %d: %w", version, err)
 		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit verified migration baseline: %w", err)
 	}
 	return nil
 }
