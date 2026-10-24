@@ -34,6 +34,62 @@ paths:
       responses:
         '200': { description: Current user }
         '401': { description: Authentication required }
+  /demo-requests:
+    post:
+      summary: Submit a public school walkthrough request
+      description: Stores prospect contact details only; do not include learner information. Repeat submissions from an email are throttled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, school_name, role, school_size, contact_consent]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 120 }
+                email: { type: string, format: email, maxLength: 254 }
+                school_name: { type: string, minLength: 2, maxLength: 180 }
+                role: { type: string, minLength: 2, maxLength: 80 }
+                school_size: { type: string, enum: [1-100, 101-500, 501-1500, 1501+] }
+                message: { type: string, maxLength: 3000 }
+                contact_consent: { type: boolean, const: true }
+                website: { type: string, description: Spam honeypot; leave blank }
+      responses:
+        '201': { description: Request received }
+        '202': { description: Spam honeypot accepted without storing a request }
+        '400': { description: Required fields or consent are invalid }
+        '429': { description: A recent request already came from this email }
+  /platform/demo-requests:
+    get:
+      summary: List walkthrough requests for the configured FURII operator
+      description: Requires a school-admin session and an email in DEMO_REQUEST_ADMIN_EMAILS.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Most recent 100 requests }
+        '403': { description: The school administrator is not on the product inbox allowlist }
+  /platform/demo-requests/{requestID}:
+    parameters:
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      summary: Update a walkthrough request status
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [new, contacted, closed] }
+      responses:
+        '200': { description: Updated request }
+        '400': { description: Invalid request ID or status }
+        '403': { description: The school administrator is not on the product inbox allowlist }
+        '404': { description: Request not found }
   /healthz:
     get:
       summary: API and database health

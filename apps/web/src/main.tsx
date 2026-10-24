@@ -2,8 +2,10 @@ import { FormEvent, MouseEvent, useCallback, useEffect, useRef, useState } from 
 import { createRoot } from 'react-dom/client'
 import { clearPendingAnswers, listPendingAnswers, removePendingAnswer, savePendingAnswer } from './offlineAnswers'
 import './style.css'
+import { MarketingLanding } from './marketing'
 
 type Identity = { user_id: string; school_id: string; display_name: string; roles: string[] }
+type DemoRequest = { id: string; name: string; email: string; school_name: string; role: string; school_size: string; message: string; status: 'new' | 'contacted' | 'closed'; created_at: string; updated_at: string }
 type School = { id: string; name: string; timezone: string; default_language: string }
 type Year = { id: string; name: string; starts_on: string; ends_on: string }
 type ClassRoom = { id: string; name: string; grade_level: string; academic_year_id: string; academic_year_name?: string }
@@ -38,6 +40,7 @@ const adminPages = [
   { id: 'curriculum', label: 'Curriculum & questions', icon: '⌘', title: 'Curriculum & question bank', description: 'Build a curriculum map and a reusable, skill-aware question bank.' },
   { id: 'assessments', label: 'Assessments', icon: '✎', title: 'Assessments', description: 'Create, publish, and assign classroom assessments.' },
   { id: 'staff', label: 'Staff access', icon: '♙', title: 'Staff access', description: 'Invite teachers, assign classes, and manage access.' },
+  { id: 'demo-requests', label: 'Walkthrough requests', icon: '✦', title: 'Walkthrough requests', description: 'Review schools asking to see FURII School OS.' },
   { id: 'settings', label: 'School settings', icon: '⚙', title: 'School settings', description: 'Manage your school profile and regional settings.' },
 ] as const
 type AdminPage = typeof adminPages[number]['id']
@@ -98,13 +101,16 @@ function App() {
   const [learningSummary, setLearningSummary] = useState<LearningSummary | null>(null)
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [staffInvitations, setStaffInvitations] = useState<StaffInvitation[]>([])
+  const [demoRequests, setDemoRequests] = useState<DemoRequest[]>([])
+  const [demoRequestsLoading, setDemoRequestsLoading] = useState(false)
+  const [savingDemoRequest, setSavingDemoRequest] = useState('')
   const [inviteLink, setInviteLink] = useState('')
   const [teacherClasses, setTeacherClasses] = useState<ClassRoom[]>([])
   const [learnerAssignments, setLearnerAssignments] = useState<LearnerAssignment[]>([])
   const [studentInviteLinks, setStudentInviteLinks] = useState<Record<string,string>>({})
   const [curriculumID, setCurriculumID] = useState('')
   const [subjectID, setSubjectID] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => window.location.pathname !== '/')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -126,7 +132,7 @@ function App() {
 
   useEffect(() => {
     if (!identity?.roles.includes('school_admin')) return
-    if (window.location.pathname === '/') window.history.replaceState({}, '', '/admin/overview')
+    if (window.location.pathname === '/' || window.location.pathname === '/login') window.history.replaceState({}, '', '/admin/overview')
   }, [identity])
 
   const refresh = useCallback(async () => {
@@ -138,7 +144,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (invitationToken || studentInvitationToken) { setLoading(false); return }
+    if (invitationToken || studentInvitationToken || window.location.pathname === '/') { setLoading(false); return }
     api<Identity>('/me').then(async (user) => { setIdentity(user); if (user.roles.includes('school_admin')) await refresh() })
       .catch(() => setIdentity(null)).finally(() => setLoading(false))
   }, [refresh, invitationToken, studentInvitationToken])
@@ -153,6 +159,16 @@ function App() {
       .catch((e) => { if (!ignore) setError(e instanceof Error ? e.message : 'Unable to load academic history.') })
     return () => { ignore = true }
   }, [passportStudent])
+
+  useEffect(() => {
+    if (!identity?.roles.includes('school_admin') || adminPage !== 'demo-requests') return
+    let ignore = false
+    setDemoRequestsLoading(true); setError('')
+    api<DemoRequest[]>('/platform/demo-requests').then((items) => { if (!ignore) setDemoRequests(items) })
+      .catch((e) => { if (!ignore) setError(e instanceof Error ? e.message : 'Unable to load walkthrough requests.') })
+      .finally(() => { if (!ignore) setDemoRequestsLoading(false) })
+    return () => { ignore = true }
+  }, [identity, adminPage])
 
   useEffect(() => {
     if (!identity?.roles.includes('school_admin')) return
@@ -207,6 +223,16 @@ function App() {
   async function submit(event: FormEvent<HTMLFormElement>, action: () => Promise<void>, message: string) {
     event.preventDefault(); setError(''); setNotice(''); setBusy(true)
     try { await action(); setNotice(message) } catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong.') } finally { setBusy(false) }
+  }
+
+  async function updateDemoRequestStatus(item: DemoRequest, status: DemoRequest['status']) {
+    setSavingDemoRequest(item.id); setError(''); setNotice('')
+    try {
+      const updated = await api<DemoRequest>(`/platform/demo-requests/${item.id}`, { method: 'PATCH', body: JSON.stringify({ status }) })
+      setDemoRequests((current) => current.map((request) => request.id === updated.id ? updated : request))
+      setNotice('Walkthrough request updated.')
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to update this request.') }
+    finally { setSavingDemoRequest('') }
   }
 
   async function login(event: FormEvent<HTMLFormElement>) {
@@ -344,6 +370,7 @@ function App() {
   if (loading) return <main className="loading">Opening FURII School OS…</main>
   if (identity?.roles.includes('student')) return <LearnerWorkspace identity={identity} initialAssignments={learnerAssignments} onLogout={() => void logout()} />
   if (identity?.roles.includes('teacher')) return <TeacherWorkspace identity={identity} classes={teacherClasses} onLogout={() => void logout()} />
+  if (!identity && window.location.pathname === '/') return <MarketingLanding />
   if (!identity) return <main className="login-shell">
     <div className="login-art"><Brand /><div className="login-copy"><p className="eyebrow">A SCHOOL THAT SEES EVERY LEARNER</p><h1>Build a stronger<br />academic foundation.</h1><p>Bring your school records, teaching, and assessment into one connected place.</p><div className="art-orbit orbit-one"/><div className="art-orbit orbit-two"/><div className="art-spark">✳</div></div><span className="login-footnote">FURII SCHOOL OS <span>·</span> MADE FOR LEARNING</span></div>
     <div className="login-pane"><form className="login-form" onSubmit={(e) => void submit(e, () => login(e), 'Welcome back.')}>
@@ -413,7 +440,10 @@ function App() {
           <div><h3>Pending invitations <span>{staffInvitations.length}</span></h3><div className="staff-list">{staffInvitations.map(invite=><article key={invite.id} className="pending-invite"><div className="staff-person"><strong>{invite.email}</strong><small>Teacher · expires {new Date(invite.expires_at).toLocaleDateString()}</small></div><button className="staff-toggle" disabled={busy} onClick={()=>void submit(new Event('submit') as unknown as FormEvent<HTMLFormElement>,()=>revokeStaffInvitation(invite.id),'Invitation revoked.')}>Revoke</button></article>)}{!staffInvitations.length&&<p className="empty">No pending invitations.</p>}</div></div>
         </div>
       </section>
-      <section className="panel settings-panel" hidden={adminPage !== 'settings'}><div className="panel-head"><div><h2>School profile</h2><p>Keep your school details and regional settings up to date.</p></div><span className="settings-mark">✳</span></div>
+<section className="panel demo-requests-panel" hidden={adminPage !== 'demo-requests'}><div className="panel-head"><div><p className="eyebrow">PRODUCT INQUIRIES</p><h2>Walkthrough requests</h2><p>Only the configured FURII product administrator can open this inbox. Keep school and learner records out of prospect conversations.</p></div><span className="count-pill">{demoRequests.filter((request) => request.status === 'new').length} new</span></div>
+        {demoRequestsLoading ? <p className="empty">Loading requests…</p> : demoRequests.length ? <div className="demo-request-list">{demoRequests.map((request) => <article className="demo-request-card" key={request.id}><div className="demo-request-head"><div><h3>{request.school_name}</h3><p>{request.name} · {request.role} · {request.school_size} learners</p></div><time dateTime={request.created_at}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(request.created_at))}</time></div><a href={`mailto:${encodeURIComponent(request.email)}?subject=${encodeURIComponent(`FURII walkthrough for ${request.school_name}`)}`}>{request.email}</a>{request.message && <p className="demo-request-message">{request.message}</p>}<label className="demo-status-label">Request status<select value={request.status} disabled={savingDemoRequest === request.id} onChange={(event) => void updateDemoRequestStatus(request, event.currentTarget.value as DemoRequest['status'])}><option value="new">New</option><option value="contacted">Contacted</option><option value="closed">Closed</option></select></label></article>)}</div> : <p className="empty">No walkthrough requests yet. New requests from the public landing page will appear here.</p>}
+      </section>
+            <section className="panel settings-panel" hidden={adminPage !== 'settings'}><div className="panel-head"><div><h2>School profile</h2><p>Keep your school details and regional settings up to date.</p></div><span className="settings-mark">✳</span></div>
         {school&&<form className="school-form" onSubmit={(e)=>{const form=e.currentTarget;void submit(e,async()=>{const f=new FormData(form);const updated=await api<School>('/school',{method:'PATCH',body:JSON.stringify({name:f.get('name'),timezone:f.get('timezone'),default_language:f.get('default_language')})});setSchool(updated)},'School profile saved.')}}><label>School name<input name="name" defaultValue={school.name} required/></label><label>Timezone<input name="timezone" defaultValue={school.timezone} required/></label><label>Default language<input name="default_language" defaultValue={school.default_language} required/></label><button className="secondary" disabled={busy}>Save profile</button></form>}
       </section><footer>FURII SCHOOL OS <span>·</span> ACADEMIC FOUNDATION</footer></div>
     </main>
