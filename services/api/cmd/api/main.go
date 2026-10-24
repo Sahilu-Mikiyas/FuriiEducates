@@ -36,6 +36,10 @@ func main() {
 		logger.Error("database unavailable", "error", err)
 		os.Exit(1)
 	}
+	if err := migrations.Up(ctx, db); err != nil {
+		logger.Error("database migration failed", "error", err)
+		os.Exit(1)
+	}
 
 	service := auth.NewService(db, cfg.SessionHashKey, cfg.SessionTTL)
 	handler := httpapi.New(service, db, cfg.CookieSecure, cfg.SessionTTL, logger)

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import './marketing.css'
 
 const views = [
@@ -68,6 +68,9 @@ function Reveal({ children, className = '' }: { children: ReactNode; className?:
 
 export function MarketingLanding() {
   const [activeView, setActiveView] = useState(0)
+  const [walkthroughBusy, setWalkthroughBusy] = useState(false)
+  const [walkthroughSent, setWalkthroughSent] = useState(false)
+  const [walkthroughError, setWalkthroughError] = useState('')
   const active = views[activeView]
 
   useEffect(() => {
@@ -88,6 +91,42 @@ export function MarketingLanding() {
     return () => observer.disconnect()
   }, [])
 
+  async function submitWalkthrough(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (walkthroughBusy) return
+    setWalkthroughBusy(true); setWalkthroughError('')
+    const form = event.currentTarget
+    const values = new FormData(form)
+    const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '')
+    try {
+      if (!apiBase) throw new Error('Walkthrough requests are not connected yet. Please try again later.')
+      const response = await fetch(`${apiBase}/api/v1/demo-requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'omit',
+        body: JSON.stringify({
+          name: values.get('name'),
+          email: values.get('email'),
+          school_name: values.get('school_name'),
+          role: values.get('role'),
+          school_size: values.get('school_size'),
+          message: values.get('message') || '',
+          contact_consent: values.get('contact_consent') === 'on',
+          website: values.get('website') || '',
+        }),
+      })
+      const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+      const body = contentType.includes('json') ? await response.json() : null
+      if (!response.ok) throw new Error(body?.error?.message ?? 'We could not send your request. Please try again shortly.')
+      setWalkthroughSent(true)
+      form.reset()
+    } catch (error) {
+      setWalkthroughError(error instanceof Error ? error.message : 'We could not send your request. Please try again shortly.')
+    } finally {
+      setWalkthroughBusy(false)
+    }
+  }
+
   return <div className="landing-page">
     <a className="landing-skip" href="#main-content">Skip to content</a>
     <header className="landing-header">
@@ -96,7 +135,7 @@ export function MarketingLanding() {
         <span><strong>FURII</strong><small>SCHOOL OS</small></span>
       </a>
       <nav className="landing-links" aria-label="Main navigation">
-        <a href="#platform">Platform</a><a href="#how-it-works">How it works</a><a href="#school-size">For every school</a><a href="#trust">Trust</a>
+        <a href="#platform">Platform</a><a href="#how-it-works">How it works</a><a href="#school-size">For every school</a><a href="#trust">Trust</a><a href="#walkthrough">Walkthrough</a>
       </nav>
       <a className="landing-signin" href="/login">Staff sign in <span aria-hidden="true">↗</span></a>
     </header>
@@ -218,9 +257,30 @@ export function MarketingLanding() {
         </div>
       </section>
 
+      <section className="landing-walkthrough" id="walkthrough">
+        <div className="walkthrough-orbit" aria-hidden="true" />
+        <Reveal className="walkthrough-intro"><p className="landing-kicker">LET’S MAP A FIT FOR YOUR SCHOOL</p><h2>See how FURII could work for your team.</h2><p>Tell us a little about your school. We’ll use this to arrange a focused walkthrough around the way you work today.</p><ul><li>For small, growing, and busy schools</li><li>No learner records needed</li><li>A real conversation about your setup</li></ul></Reveal>
+        <Reveal className="walkthrough-form-wrap">
+          {walkthroughSent ? <div className="walkthrough-success" role="status"><span>✓</span><p className="landing-kicker">REQUEST RECEIVED</p><h3>Thanks. We’ll be in touch.</h3><p>Your request is saved. The FURII team can follow up using the school contact details you provided.</p><button className="landing-button landing-button-quiet" type="button" onClick={() => setWalkthroughSent(false)}>Send another request</button></div> :
+          <form className="walkthrough-form" onSubmit={(event) => void submitWalkthrough(event)}>
+            <div className="walkthrough-form-heading"><span>F</span><div><strong>Request a walkthrough</strong><small>About two minutes · no account needed</small></div></div>
+            <label>Your name<input name="name" autoComplete="name" minLength={2} maxLength={120} required placeholder="e.g. Hana Bekele" /></label>
+            <div className="walkthrough-fields-two"><label>Work email<input name="email" type="email" autoComplete="email" maxLength={254} required placeholder="you@school.org" /></label><label>Your role<input name="role" maxLength={80} required placeholder="School leader" /></label></div>
+            <label>School name<input name="school_name" maxLength={180} required placeholder="Your school" /></label>
+            <label>Approximate learner count<select name="school_size" required defaultValue=""><option value="" disabled>Select a range</option><option value="1-100">1–100 learners</option><option value="101-500">101–500 learners</option><option value="501-1500">501–1,500 learners</option><option value="1501+">More than 1,500 learners</option></select></label>
+            <label>What would you like to improve first? <span className="walkthrough-optional">Optional</span><textarea name="message" rows={3} maxLength={3000} placeholder="For example: student records, assessment, or seeing learning progress…" /></label>
+            <label className="walkthrough-consent"><input name="contact_consent" type="checkbox" required /><span>FURII may contact me about this walkthrough request. I have not included private learner information.</span></label>
+            <label className="walkthrough-honeypot" aria-hidden="true">Leave this field blank<input name="website" tabIndex={-1} autoComplete="off" /></label>
+            {walkthroughError && <p className="walkthrough-error" role="alert">{walkthroughError}</p>}
+            <button className="landing-button landing-button-primary walkthrough-submit" type="submit" disabled={walkthroughBusy}>{walkthroughBusy ? 'Sending…' : 'Request my walkthrough'} <span aria-hidden="true">→</span></button>
+            <small className="walkthrough-privacy">Your contact details are stored in the FURII School OS database for follow-up. Do not submit learner data.</small>
+          </form>}
+        </Reveal>
+      </section>
+
       <section className="landing-final">
         <div className="final-orbit" />
-        <Reveal><p className="landing-kicker">MAKE THE NEXT SCHOOL DAY CLEARER</p><h2>Give your school one place<br />to move learning forward.</h2><p>See the workspace through your school’s staff sign-in.</p><a className="landing-button landing-button-primary" href="/login">Go to staff sign in <span aria-hidden="true">↗</span></a></Reveal>
+        <Reveal><p className="landing-kicker">MAKE THE NEXT SCHOOL DAY CLEARER</p><h2>Give your school one place<br />to move learning forward.</h2><p>Talk with us about a starting point that fits your school.</p><a className="landing-button landing-button-primary" href="#walkthrough">Request a walkthrough <span aria-hidden="true">↓</span></a></Reveal>
         <div className="final-aside"><span>F</span><small>FURII SCHOOL OS<br />MADE FOR LEARNING</small></div>
       </section>
     </main>
