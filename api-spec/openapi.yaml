@@ -36,21 +36,30 @@ paths:
         '401': { description: Authentication required }
   /demo-requests:
     post:
-      summary: Submit a public school walkthrough request
-      description: Stores prospect contact details only; do not include learner information. Repeat submissions from an email are throttled.
+      summary: Submit a public school setup request
+      description: Stores school preferences and contact details for product review; no workspace or account is created until a configured FURII operator prepares it. Do not include learner information. Repeat submissions from an email are throttled.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [name, email, school_name, role, school_size, contact_consent]
+              required: [name, email, school_name, role, school_size, timezone, region, default_language, priorities, contact_consent]
               properties:
                 name: { type: string, minLength: 2, maxLength: 120 }
                 email: { type: string, format: email, maxLength: 254 }
                 school_name: { type: string, minLength: 2, maxLength: 180 }
                 role: { type: string, minLength: 2, maxLength: 80 }
                 school_size: { type: string, enum: [1-100, 101-500, 501-1500, 1501+] }
+                timezone: { type: string, description: IANA timezone name }
+                region: { type: string, minLength: 2, maxLength: 80 }
+                default_language: { type: string, minLength: 2, maxLength: 16 }
+                priorities:
+                  type: array
+                  minItems: 1
+                  maxItems: 7
+                  uniqueItems: true
+                  items: { type: string, enum: [student-records, curriculum, assessment, learning-progress, staff-coordination, academic-history, family-communication] }
                 message: { type: string, maxLength: 3000 }
                 contact_consent: { type: boolean, const: true }
                 website: { type: string, description: Spam honeypot; leave blank }
@@ -90,6 +99,23 @@ paths:
         '400': { description: Invalid request ID or status }
         '403': { description: The school administrator is not on the product inbox allowlist }
         '404': { description: Request not found }
+    post:
+      summary: Prepare a school and create its first administrator invitation
+      description: Requires a school-admin session and an email in DEMO_REQUEST_ADMIN_EMAILS. Creates the school and setup profile in one transaction, returns a seven-day one-time token once, and marks the request as contacted.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: School, setup profile, and one-time invitation created }
+        '200': { description: A pending administrator invite was renewed and its previous token invalidated }
+        '400': { description: Invalid request ID }
+        '403': { description: Not an allowed product operator }
+        '404': { description: Request not found }
+        '409': { description: Request is closed, email already has an account or pending invite, or its invite was already claimed }
+  /school/setup-profile:
+    get:
+      summary: Read the school setup choices saved before administrator signup
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Learner count, region, and priorities chosen during school setup }
   /healthz:
     get:
       summary: API and database health

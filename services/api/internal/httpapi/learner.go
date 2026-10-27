@@ -465,7 +465,7 @@ func (a *API) saveStudentAnswer(w http.ResponseWriter, r *http.Request, id auth.
 		req.Revision = currentRevision + 1
 	}
 	if req.Revision <= currentRevision {
-		writeError(w, 409, "STALE_REVISION", "A newer answer is already saved. Reload the assessment to reconcile it.", map[string]int{"current_revision": currentRevision})
+		writeError(w, 409, "STALE_REVISION", "A newer answer is already saved. Reload the assessment to reconcile it.", map[string]string{"current_revision": strconv.Itoa(currentRevision)})
 		return
 	}
 	_, err = tx.Exec(r.Context(), `INSERT INTO assessment_answers(attempt_id,school_id,question_id,answer,revision,idempotency_key,flagged,saved_at) VALUES($1,$2,$3,$4,$5,NULLIF($6,''),$7,now()) ON CONFLICT(attempt_id,question_id) DO UPDATE SET answer=EXCLUDED.answer,revision=EXCLUDED.revision,idempotency_key=EXCLUDED.idempotency_key,flagged=EXCLUDED.flagged,saved_at=now() WHERE assessment_answers.is_correct IS NULL AND EXCLUDED.revision>assessment_answers.revision`, r.PathValue("attemptID"), id.SchoolID, r.PathValue("questionID"), []byte(req.Answer), req.Revision, req.RequestID, req.Flagged)

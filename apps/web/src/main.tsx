@@ -5,7 +5,8 @@ import './style.css'
 import { MarketingLanding } from './marketing'
 
 type Identity = { user_id: string; school_id: string; display_name: string; roles: string[] }
-type DemoRequest = { id: string; name: string; email: string; school_name: string; role: string; school_size: string; message: string; status: 'new' | 'contacted' | 'closed'; created_at: string; updated_at: string }
+type DemoRequest = { id: string; name: string; email: string; school_name: string; role: string; school_size: string; timezone: string; region: string; default_language: string; priorities: string[]; prepared_school_id: string; message: string; status: 'new' | 'contacted' | 'closed'; created_at: string; updated_at: string }
+type SchoolSetupProfile = { learner_count_band: string; region: string; priorities: string[] }
 type School = { id: string; name: string; timezone: string; default_language: string }
 type Year = { id: string; name: string; starts_on: string; ends_on: string }
 type ClassRoom = { id: string; name: string; grade_level: string; academic_year_id: string; academic_year_name?: string }
@@ -40,7 +41,7 @@ const adminPages = [
   { id: 'curriculum', label: 'Curriculum & questions', icon: '⌘', title: 'Curriculum & question bank', description: 'Build a curriculum map and a reusable, skill-aware question bank.' },
   { id: 'assessments', label: 'Assessments', icon: '✎', title: 'Assessments', description: 'Create, publish, and assign classroom assessments.' },
   { id: 'staff', label: 'Staff access', icon: '♙', title: 'Staff access', description: 'Invite teachers, assign classes, and manage access.' },
-  { id: 'demo-requests', label: 'Walkthrough requests', icon: '✦', title: 'Walkthrough requests', description: 'Review schools asking to see FURII School OS.' },
+  { id: 'demo-requests', label: 'School setup requests', icon: '✦', title: 'School setup requests', description: 'Review and prepare new school workspaces.' },
   { id: 'settings', label: 'School settings', icon: '⚙', title: 'School settings', description: 'Manage your school profile and regional settings.' },
 ] as const
 type AdminPage = typeof adminPages[number]['id']
@@ -83,9 +84,11 @@ const api = async <T,>(path: string, init?: RequestInit): Promise<T> => {
 
 function App() {
   const invitationToken = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('invite') ?? ''
+  const invitationRole = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('invite-role') ?? 'teacher'
   const studentInvitationToken = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('student-invite') ?? ''
   const [identity, setIdentity] = useState<Identity | null>(null)
   const [school, setSchool] = useState<School | null>(null)
+  const [schoolSetupProfile, setSchoolSetupProfile] = useState<SchoolSetupProfile | null>(null)
   const [years, setYears] = useState<Year[]>([])
   const [classes, setClasses] = useState<ClassRoom[]>([])
   const [students, setStudents] = useState<Student[]>([])
@@ -105,6 +108,8 @@ function App() {
   const [demoRequestsLoading, setDemoRequestsLoading] = useState(false)
   const [savingDemoRequest, setSavingDemoRequest] = useState('')
   const [inviteLink, setInviteLink] = useState('')
+  const [schoolSetupInviteLink, setSchoolSetupInviteLink] = useState('')
+  const [preparingSchoolID, setPreparingSchoolID] = useState('')
   const [teacherClasses, setTeacherClasses] = useState<ClassRoom[]>([])
   const [learnerAssignments, setLearnerAssignments] = useState<LearnerAssignment[]>([])
   const [studentInviteLinks, setStudentInviteLinks] = useState<Record<string,string>>({})
@@ -136,10 +141,10 @@ function App() {
   }, [identity])
 
   const refresh = useCallback(async () => {
-    const [schoolData, yearData, classData, studentData] = await Promise.all([
-      api<School>('/school'), api<Year[]>('/academic-years'), api<ClassRoom[]>('/classes'), api<Student[]>('/students'),
+    const [schoolData, setupProfile, yearData, classData, studentData] = await Promise.all([
+      api<School>('/school'), api<SchoolSetupProfile | null>('/school/setup-profile'), api<Year[]>('/academic-years'), api<ClassRoom[]>('/classes'), api<Student[]>('/students'),
     ])
-    setSchool(schoolData); setYears(yearData); setClasses(classData); setStudents(studentData)
+    setSchool(schoolData); setSchoolSetupProfile(setupProfile); setYears(yearData); setClasses(classData); setStudents(studentData)
     setPassportStudent((current) => current || studentData[0]?.id || '')
   }, [])
 
@@ -223,6 +228,17 @@ function App() {
   async function submit(event: FormEvent<HTMLFormElement>, action: () => Promise<void>, message: string) {
     event.preventDefault(); setError(''); setNotice(''); setBusy(true)
     try { await action(); setNotice(message) } catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong.') } finally { setBusy(false) }
+  }
+
+  async function prepareDemoSchool(item: DemoRequest) {
+    setPreparingSchoolID(item.id); setError(''); setNotice(''); setSchoolSetupInviteLink('')
+    try {
+      const result = await api<{request: DemoRequest; invitation_token: string; expires_at: string}>('/platform/demo-requests/' + item.id + '/prepare', { method: 'POST', body: JSON.stringify({}) })
+      setDemoRequests((current) => current.map((request) => request.id === item.id ? result.request : request))
+      setSchoolSetupInviteLink(window.location.origin + '/#invite=' + encodeURIComponent(result.invitation_token) + '&invite-role=school_admin')
+      setNotice('School workspace prepared. Copy the one-time administrator invitation and send it to ' + item.email + '.')
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to prepare this school.') }
+    finally { setPreparingSchoolID('') }
   }
 
   async function updateDemoRequestStatus(item: DemoRequest, status: DemoRequest['status']) {
@@ -365,7 +381,7 @@ function App() {
     setQuestions(await api<Question[]>('/questions'))
   }
 
-  if (invitationToken) return <InviteAcceptPage token={invitationToken} />
+  if (invitationToken) return <InviteAcceptPage token={invitationToken} role={invitationRole} />
   if (studentInvitationToken) return <StudentInviteAcceptPage token={studentInvitationToken} />
   if (loading) return <main className="loading">Opening FURII School OS…</main>
   if (identity?.roles.includes('student')) return <LearnerWorkspace identity={identity} initialAssignments={learnerAssignments} onLogout={() => void logout()} />
@@ -440,26 +456,31 @@ function App() {
           <div><h3>Pending invitations <span>{staffInvitations.length}</span></h3><div className="staff-list">{staffInvitations.map(invite=><article key={invite.id} className="pending-invite"><div className="staff-person"><strong>{invite.email}</strong><small>Teacher · expires {new Date(invite.expires_at).toLocaleDateString()}</small></div><button className="staff-toggle" disabled={busy} onClick={()=>void submit(new Event('submit') as unknown as FormEvent<HTMLFormElement>,()=>revokeStaffInvitation(invite.id),'Invitation revoked.')}>Revoke</button></article>)}{!staffInvitations.length&&<p className="empty">No pending invitations.</p>}</div></div>
         </div>
       </section>
-<section className="panel demo-requests-panel" hidden={adminPage !== 'demo-requests'}><div className="panel-head"><div><p className="eyebrow">PRODUCT INQUIRIES</p><h2>Walkthrough requests</h2><p>Only the configured FURII product administrator can open this inbox. Keep school and learner records out of prospect conversations.</p></div><span className="count-pill">{demoRequests.filter((request) => request.status === 'new').length} new</span></div>
-        {demoRequestsLoading ? <p className="empty">Loading requests…</p> : demoRequests.length ? <div className="demo-request-list">{demoRequests.map((request) => <article className="demo-request-card" key={request.id}><div className="demo-request-head"><div><h3>{request.school_name}</h3><p>{request.name} · {request.role} · {request.school_size} learners</p></div><time dateTime={request.created_at}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(request.created_at))}</time></div><a href={`mailto:${encodeURIComponent(request.email)}?subject=${encodeURIComponent(`FURII walkthrough for ${request.school_name}`)}`}>{request.email}</a>{request.message && <p className="demo-request-message">{request.message}</p>}<label className="demo-status-label">Request status<select value={request.status} disabled={savingDemoRequest === request.id} onChange={(event) => void updateDemoRequestStatus(request, event.currentTarget.value as DemoRequest['status'])}><option value="new">New</option><option value="contacted">Contacted</option><option value="closed">Closed</option></select></label></article>)}</div> : <p className="empty">No walkthrough requests yet. New requests from the public landing page will appear here.</p>}
+<section className="panel demo-requests-panel" hidden={adminPage !== 'demo-requests'}><div className="panel-head"><div><p className="eyebrow">PRODUCT INQUIRIES</p><h2>School setup requests</h2><p>Review a school’s size, region, and priorities. Preparing creates the school workspace and a one-time administrator invite; the FURII operator shares that invite privately.</p></div><span className="count-pill">{demoRequests.filter((request) => request.status === 'new').length} new</span></div>
+        {schoolSetupInviteLink&&<div className="invite-result"><div><strong>One-time school administrator link</strong><small>Share privately with the school contact. It expires in 7 days and works once.</small><code>{schoolSetupInviteLink}</code></div><button className="secondary compact" onClick={()=>void navigator.clipboard.writeText(schoolSetupInviteLink).then(()=>setNotice('Administrator invitation copied.')).catch(()=>setError('Could not access clipboard. Copy the link manually.'))}>Copy link</button></div>}
+        {demoRequestsLoading ? <p className="empty">Loading requests…</p> : demoRequests.length ? <div className="demo-request-list">{demoRequests.map((request) => <article className="demo-request-card" key={request.id}><div className="demo-request-head"><div><h3>{request.school_name}</h3><p>{request.name} · {request.role} · {request.school_size} learners</p></div><time dateTime={request.created_at}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(request.created_at))}</time></div><a href={'mailto:' + encodeURIComponent(request.email) + '?subject=' + encodeURIComponent('FURII school setup for ' + request.school_name)}>{request.email}</a><p className="demo-request-message">Region: {request.region} · Timezone: {request.timezone} · Language: {request.default_language}</p><p className="demo-request-message">Priorities: {request.priorities?.join(', ') || 'Not provided'}</p>{request.message && <p className="demo-request-message">{request.message}</p>}<label className="demo-status-label">Request status<select value={request.status} disabled={savingDemoRequest === request.id} onChange={(event) => void updateDemoRequestStatus(request, event.currentTarget.value as DemoRequest['status'])}><option value="new">New</option><option value="contacted">Contacted</option><option value="closed">Closed</option></select></label><div className="setup-request-action">{request.prepared_school_id&&<span className="status-pill">School workspace prepared</span>}<button className="primary compact" disabled={Boolean(preparingSchoolID)||request.status==='closed'} onClick={()=>void prepareDemoSchool(request)}>{preparingSchoolID===request.id?'Preparing…':request.prepared_school_id?'Renew admin invite':'Prepare school + admin invite'}</button></div></article>)}</div> : <p className="empty">No school setup requests yet. New requests from the public landing page will appear here.</p>}
       </section>
             <section className="panel settings-panel" hidden={adminPage !== 'settings'}><div className="panel-head"><div><h2>School profile</h2><p>Keep your school details and regional settings up to date.</p></div><span className="settings-mark">✳</span></div>
+        {schoolSetupProfile&&<article className="setup-profile-card"><p className="eyebrow">YOUR ONBOARDING PLAN</p><h3>{schoolSetupProfile.learner_count_band} learners · {schoolSetupProfile.region}</h3><p>Priorities chosen before setup</p><div>{schoolSetupProfile.priorities.map((priority)=><span key={priority}>{priority.replaceAll('-',' ')}</span>)}</div></article>}
         {school&&<form className="school-form" onSubmit={(e)=>{const form=e.currentTarget;void submit(e,async()=>{const f=new FormData(form);const updated=await api<School>('/school',{method:'PATCH',body:JSON.stringify({name:f.get('name'),timezone:f.get('timezone'),default_language:f.get('default_language')})});setSchool(updated)},'School profile saved.')}}><label>School name<input name="name" defaultValue={school.name} required/></label><label>Timezone<input name="timezone" defaultValue={school.timezone} required/></label><label>Default language<input name="default_language" defaultValue={school.default_language} required/></label><button className="secondary" disabled={busy}>Save profile</button></form>}
       </section><footer>FURII SCHOOL OS <span>·</span> ACADEMIC FOUNDATION</footer></div>
     </main>
   </div>
 }
 
-function InviteAcceptPage({token}:{token:string}) {
+function InviteAcceptPage({token,role}:{token:string;role:string}) {
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('')
+  const [acceptedRole,setAcceptedRole]=useState(role)
   async function accept(event:FormEvent<HTMLFormElement>) {
     event.preventDefault();setBusy(true);setError('');setSuccess('')
     const form=new FormData(event.currentTarget),password=String(form.get('password')||''),confirm=String(form.get('confirm_password')||'')
     if(password!==confirm){setError('The passwords do not match.');setBusy(false);return}
-    try {const result=await api<{email:string}>('/staff/invitations/accept',{method:'POST',body:JSON.stringify({token,display_name:form.get('display_name'),password})});setSuccess(`Your teacher account for ${result.email} is ready. Sign in with the password you just created.`)}
+    try {const result=await api<{email:string;role:string}>('/staff/invitations/accept',{method:'POST',body:JSON.stringify({token,display_name:form.get('display_name'),password})});setSuccess(result.email);setAcceptedRole(result.role)}
     catch(e){setError(e instanceof Error?e.message:'Unable to accept this invitation.')}finally{setBusy(false)}
   }
-  return <main className="invite-shell"><div className="invite-card"><Brand/><p className="eyebrow">TEACHER ACCOUNT</p><h1>Set up your account</h1><p className="muted">Choose your name and a strong password to accept this school invitation.</p>{success?<><p className="invite-success">{success}</p><a className="primary invite-login-link" href="/">Continue to sign in <span>→</span></a></>:<form className="stack-form invite-form" onSubmit={(e)=>void accept(e)}><label>Your name<input name="display_name" autoComplete="name" required maxLength={200}/></label><label>Create password<input name="password" type="password" autoComplete="new-password" minLength={12} required/><small>Use at least 12 characters.</small></label><label>Confirm password<input name="confirm_password" type="password" autoComplete="new-password" minLength={12} required/></label>{error&&<p className="form-error" role="alert">{error}</p>}<button className="primary" disabled={busy}>{busy?'Creating account…':'Accept invitation'} <span>→</span></button></form>}</div></main>
+  const roleLabel = acceptedRole === 'school_admin' ? 'school administrator' : 'teacher'
+  const roleTitle = acceptedRole === 'school_admin' ? 'SCHOOL ADMINISTRATOR ACCESS' : 'TEACHER ACCOUNT'
+  return <main className="invite-shell"><div className="invite-card"><Brand/><p className="eyebrow">{roleTitle}</p><h1>Set up your account</h1><p className="muted">Choose your name and a strong password to accept this {roleLabel} invitation.</p>{success?<><p className="invite-success">Your {roleLabel} account for {success} is ready. Sign in with the password you just created.</p><a className="primary invite-login-link" href="/">Continue to sign in <span>→</span></a></>:<form className="stack-form invite-form" onSubmit={(e)=>void accept(e)}><label>Your name<input name="display_name" autoComplete="name" required maxLength={200}/></label><label>Create password<input name="password" type="password" autoComplete="new-password" minLength={12} required/><small>Use at least 12 characters.</small></label><label>Confirm password<input name="confirm_password" type="password" autoComplete="new-password" minLength={12} required/></label>{error&&<p className="form-error" role="alert">{error}</p>}<button className="primary" disabled={busy}>{busy?'Creating account…':'Accept invitation'} <span>→</span></button></form>}</div></main>
 }
 
 function StudentInviteAcceptPage({token}:{token:string}) {

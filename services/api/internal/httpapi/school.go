@@ -55,6 +55,7 @@ func (a *API) registerSchoolRoutes(mux *http.ServeMux) {
 	a.registerIntelligenceRoutes(mux)
 	a.registerDemoRequestRoutes(mux)
 	mux.HandleFunc("GET /api/v1/school", a.admin(a.getSchool))
+	mux.HandleFunc("GET /api/v1/school/setup-profile", a.admin(a.getSchoolSetupProfile))
 	mux.HandleFunc("GET /api/v1/school/learning-summary", a.admin(a.getSchoolLearningSummary))
 	mux.HandleFunc("PATCH /api/v1/school", a.admin(a.updateSchool))
 	mux.HandleFunc("GET /api/v1/academic-years", a.admin(a.listAcademicYears))
@@ -86,6 +87,25 @@ func (a *API) getSchoolLearningSummary(w http.ResponseWriter, r *http.Request, i
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": summary})
+}
+
+func (a *API) getSchoolSetupProfile(w http.ResponseWriter, r *http.Request, id auth.Identity) {
+	var profile struct {
+		LearnerCountBand string   `json:"learner_count_band"`
+		Region           string   `json:"region"`
+		Priorities       []string `json:"priorities"`
+	}
+	err := a.db.QueryRow(r.Context(), "SELECT learner_count_band,region,priorities FROM school_setup_profiles WHERE school_id=$1", id.SchoolID).
+		Scan(&profile.LearnerCountBand, &profile.Region, &profile.Priorities)
+	if errors.Is(err, pgx.ErrNoRows) {
+		writeJSON(w, http.StatusOK, map[string]any{"data": nil})
+		return
+	}
+	if err != nil {
+		a.databaseError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": profile})
 }
 
 func (a *API) getSchool(w http.ResponseWriter, r *http.Request, id auth.Identity) {
