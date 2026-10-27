@@ -351,4 +351,4 @@
   .use-case-card:hover,.step-card:hover,.landing-button:hover,.priority-option:hover{transform:none}
 }
 
-\n.landing-page main section[id]{scroll-margin-top:88px}\n
+.landing-page main section[id]{scroll-margin-top:88px}
