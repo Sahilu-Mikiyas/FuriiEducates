@@ -45,6 +45,14 @@ jobs:
       - name: Build API
         working-directory: services/api
         run: go mod tidy && go build ./...
+      - name: Prepare Supabase roles for migrations
+        env:
+          POSTGRES_DB: furii
+          POSTGRES_USER: furii
+        run: |
+          postgres_container="$(docker ps -q --filter ancestor=postgres:17 | head -n 1)"
+          test -n "$postgres_container"
+          docker exec "$postgres_container" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -c 'CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;'
       - name: Apply database migrations
         working-directory: services/api
         run: go run github.com/pressly/goose/v3/cmd/goose@v3.24.1 -dir migrations postgres "$DATABASE_URL" up
