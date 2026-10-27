@@ -29,9 +29,11 @@ ALTER TABLE public.staff_invitations DROP CONSTRAINT staff_invitations_role_chec
 ALTER TABLE public.staff_invitations ADD CONSTRAINT staff_invitations_role_check CHECK (role IN ('teacher','school_admin'));
 
 -- +goose Down
+-- +goose StatementBegin
 DO $$
 BEGIN
     RAISE EXCEPTION '00012_school_onboarding is intentionally irreversible because it stores school setup data';
 END
 $$;
+-- +goose StatementEnd
 

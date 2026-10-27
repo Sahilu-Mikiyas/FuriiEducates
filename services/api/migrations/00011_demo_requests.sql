@@ -22,8 +22,10 @@ REVOKE ALL PRIVILEGES ON TABLE public.demo_requests FROM PUBLIC, anon, authentic
 
 -- +goose Down
 -- Preserve prospect contact records; this migration is intentionally irreversible.
+-- +goose StatementBegin
 DO $$
 BEGIN
     RAISE EXCEPTION '00011_demo_requests is intentionally irreversible';
 END
 $$;
+-- +goose StatementEnd
