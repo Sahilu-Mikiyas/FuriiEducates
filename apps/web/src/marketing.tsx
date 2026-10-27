@@ -68,9 +68,12 @@ function Reveal({ children, className = '' }: { children: ReactNode; className?:
 
 export function MarketingLanding() {
   const [activeView, setActiveView] = useState(0)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [walkthroughBusy, setWalkthroughBusy] = useState(false)
   const [walkthroughSent, setWalkthroughSent] = useState(false)
   const [walkthroughError, setWalkthroughError] = useState('')
+  const [walkthroughStep, setWalkthroughStep] = useState(0)
+  const [setup, setSetup] = useState({ name: '', email: '', role: '', school_name: '', school_size: '', timezone: 'Africa/Addis_Ababa', region: 'ET', default_language: 'en', priorities: [] as string[], message: '', contact_consent: false, website: '' })
   const active = views[activeView]
 
   useEffect(() => {
@@ -91,40 +94,46 @@ export function MarketingLanding() {
     return () => observer.disconnect()
   }, [])
 
+  function updateSetup<K extends keyof typeof setup>(field: K, value: typeof setup[K]) {
+    setSetup((current) => ({ ...current, [field]: value }))
+  }
+
+  function nextStep(form: HTMLFormElement) {
+    setWalkthroughError('')
+    if (walkthroughStep === 1 && setup.priorities.length === 0) {
+      setWalkthroughError('Choose at least one area so we can prepare a useful starting point.')
+      return
+    }
+    const fieldset = form.querySelector<HTMLElement>('[data-wizard-step="' + walkthroughStep + '"]')
+    const invalid = fieldset?.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(':invalid')
+    if (invalid) { invalid.reportValidity(); invalid.focus(); return }
+    setWalkthroughStep((step) => Math.min(step + 1, 2))
+  }
+
   async function submitWalkthrough(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (walkthroughBusy) return
+    if (walkthroughStep === 0) { nextStep(event.currentTarget); return }
+    if (setup.priorities.length === 0) {
+      setWalkthroughError('Choose at least one area you want to improve.')
+      setWalkthroughStep(1)
+      return
+    }
     setWalkthroughBusy(true); setWalkthroughError('')
-    const form = event.currentTarget
-    const values = new FormData(form)
     const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '')
     try {
-      if (!apiBase) throw new Error('Walkthrough requests are not connected yet. Please try again later.')
-      const response = await fetch(`${apiBase}/api/v1/demo-requests`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'omit',
-        body: JSON.stringify({
-          name: values.get('name'),
-          email: values.get('email'),
-          school_name: values.get('school_name'),
-          role: values.get('role'),
-          school_size: values.get('school_size'),
-          message: values.get('message') || '',
-          contact_consent: values.get('contact_consent') === 'on',
-          website: values.get('website') || '',
-        }),
+      if (!apiBase) throw new Error('School setup is not connected right now. Please try again later.')
+      const response = await fetch(apiBase + '/api/v1/demo-requests', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'omit',
+        body: JSON.stringify(setup),
       })
       const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
       const body = contentType.includes('json') ? await response.json() : null
-      if (!response.ok) throw new Error(body?.error?.message ?? 'We could not send your request. Please try again shortly.')
-      setWalkthroughSent(true)
-      form.reset()
+      if (!response.ok) throw new Error(body?.error?.message ?? 'We could not save your setup. Please try again shortly.')
+      setWalkthroughSent(true); setWalkthroughStep(0)
     } catch (error) {
-      setWalkthroughError(error instanceof Error ? error.message : 'We could not send your request. Please try again shortly.')
-    } finally {
-      setWalkthroughBusy(false)
-    }
+      setWalkthroughError(error instanceof Error ? error.message : 'We could not save your setup. Please try again shortly.')
+    } finally { setWalkthroughBusy(false) }
   }
 
   return <div className="landing-page">
@@ -134,10 +143,11 @@ export function MarketingLanding() {
         <span className="landing-brand-mark">F</span>
         <span><strong>FURII</strong><small>SCHOOL OS</small></span>
       </a>
-      <nav className="landing-links" aria-label="Main navigation">
-        <a href="#platform">Platform</a><a href="#how-it-works">How it works</a><a href="#school-size">For every school</a><a href="#trust">Trust</a><a href="#walkthrough">Walkthrough</a>
+      <button type="button" className="landing-menu-toggle" aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileNavOpen} aria-controls="landing-navigation" onClick={() => setMobileNavOpen((open) => !open)}><span /><span /></button>
+      <nav id="landing-navigation" className={mobileNavOpen ? "landing-links is-open" : "landing-links"} aria-label="Main navigation">
+        <a href="#platform" onClick={() => setMobileNavOpen(false)}>Platform</a><a href="#how-it-works" onClick={() => setMobileNavOpen(false)}>How it works</a><a href="#school-size" onClick={() => setMobileNavOpen(false)}>For every school</a><a href="#trust" onClick={() => setMobileNavOpen(false)}>Trust</a><a href="#walkthrough" onClick={() => setMobileNavOpen(false)}>Get started</a>
       </nav>
-      <a className="landing-signin" href="/login">Staff sign in <span aria-hidden="true">↗</span></a>
+      <a className="landing-signin" href="/login" onClick={() => setMobileNavOpen(false)}>Sign in <span aria-hidden="true">↗</span></a>
     </header>
 
     <main id="main-content">
@@ -193,7 +203,7 @@ export function MarketingLanding() {
         <div className="landing-demo-inner">
           <Reveal className="demo-copy">
             <p className="landing-kicker">ONE PLATFORM, CLEAR ROLES</p>
-            <h2 id="demo-title">Everyone sees what helps them do their best work.</h2>
+            <h2 id="demo-title">Every role gets a clearer way to work.</h2>
             <p>Choose a view to see how the same school system supports leadership, teaching, and learning.</p>
             <div className="demo-tabs" role="tablist" aria-label="Choose a FURII workspace">
               {views.map((view, index) => <button key={view.key} id={`demo-tab-${view.key}`} type="button" role="tab" aria-selected={activeView === index} aria-controls="demo-panel" onClick={() => setActiveView(index)}>{view.label}<span>{activeView === index ? '↗' : '＋'}</span></button>)}
@@ -259,28 +269,42 @@ export function MarketingLanding() {
 
       <section className="landing-walkthrough" id="walkthrough">
         <div className="walkthrough-orbit" aria-hidden="true" />
-        <Reveal className="walkthrough-intro"><p className="landing-kicker">LET’S MAP A FIT FOR YOUR SCHOOL</p><h2>See how FURII could work for your team.</h2><p>Tell us a little about your school. We’ll use this to arrange a focused walkthrough around the way you work today.</p><ul><li>For small, growing, and busy schools</li><li>No learner records needed</li><li>A real conversation about your setup</li></ul></Reveal>
+        <Reveal className="walkthrough-intro"><p className="landing-kicker">LET’S MAP A FIT FOR YOUR SCHOOL</p><h2>See how FURII could work for your team.</h2><p>Share a few details before you create an account. We’ll prepare a school workspace and invite its administrator once the request is reviewed.</p><ul><li>For small, growing, and busy schools</li><li>No learner records needed</li><li>Your school profile ready before you sign in</li></ul></Reveal>
         <Reveal className="walkthrough-form-wrap">
-          {walkthroughSent ? <div className="walkthrough-success" role="status"><span>✓</span><p className="landing-kicker">REQUEST RECEIVED</p><h3>Thanks. We’ll be in touch.</h3><p>Your request is saved. The FURII team can follow up using the school contact details you provided.</p><button className="landing-button landing-button-quiet" type="button" onClick={() => setWalkthroughSent(false)}>Send another request</button></div> :
-          <form className="walkthrough-form" onSubmit={(event) => void submitWalkthrough(event)}>
-            <div className="walkthrough-form-heading"><span>F</span><div><strong>Request a walkthrough</strong><small>About two minutes · no account needed</small></div></div>
-            <label>Your name<input name="name" autoComplete="name" minLength={2} maxLength={120} required placeholder="e.g. Hana Bekele" /></label>
-            <div className="walkthrough-fields-two"><label>Work email<input name="email" type="email" autoComplete="email" maxLength={254} required placeholder="you@school.org" /></label><label>Your role<input name="role" maxLength={80} required placeholder="School leader" /></label></div>
-            <label>School name<input name="school_name" maxLength={180} required placeholder="Your school" /></label>
-            <label>Approximate learner count<select name="school_size" required defaultValue=""><option value="" disabled>Select a range</option><option value="1-100">1–100 learners</option><option value="101-500">101–500 learners</option><option value="501-1500">501–1,500 learners</option><option value="1501+">More than 1,500 learners</option></select></label>
-            <label>What would you like to improve first? <span className="walkthrough-optional">Optional</span><textarea name="message" rows={3} maxLength={3000} placeholder="For example: student records, assessment, or seeing learning progress…" /></label>
-            <label className="walkthrough-consent"><input name="contact_consent" type="checkbox" required /><span>FURII may contact me about this walkthrough request. I have not included private learner information.</span></label>
-            <label className="walkthrough-honeypot" aria-hidden="true">Leave this field blank<input name="website" tabIndex={-1} autoComplete="off" /></label>
+          {walkthroughSent ? <div className="walkthrough-success" role="status"><span>✓</span><p className="landing-kicker">SCHOOL SETUP SAVED</p><h3>Your school profile is in the queue.</h3><p>FURII will review your details, prepare the school workspace, and send a private one-time administrator invitation. Your school size, region, and chosen priorities will be saved in School Profile before you sign in.</p><button className="landing-button landing-button-quiet" type="button" onClick={() => { setWalkthroughSent(false); setSetup({ name: '', email: '', role: '', school_name: '', school_size: '', timezone: 'Africa/Addis_Ababa', region: 'ET', default_language: 'en', priorities: [], message: '', contact_consent: false, website: '' }) }}>Done</button></div> :
+          <form className="walkthrough-form setup-wizard" onSubmit={(event) => void submitWalkthrough(event)}>
+            <div className="walkthrough-form-heading"><span>F</span><div><strong>School setup</strong><small>Two quick steps · no account needed yet</small></div></div>
+            <div className="wizard-progress" aria-label={'Step ' + (walkthroughStep + 1) + ' of 2'}>
+              <button type="button" className={walkthroughStep === 0 ? 'active' : 'complete'} aria-current={walkthroughStep === 0 ? 'step' : undefined} onClick={() => walkthroughStep > 0 && setWalkthroughStep(0)}><span>{walkthroughStep > 0 ? '✓' : '01'}</span>School & priorities</button>
+              <button type="button" className={walkthroughStep === 1 ? 'active' : ''} aria-current={walkthroughStep === 1 ? 'step' : undefined}><span>02</span>Contact</button>
+            </div>
+            {walkthroughStep === 0 && <fieldset className="wizard-step" data-wizard-step="0">
+              <legend><span>01 · YOUR SCHOOL</span><strong>Tell us what you’re building.</strong><small>Choose a starting point that fits your school.</small></legend>
+              <label>School name<input name="school_name" autoComplete="organization" minLength={2} maxLength={180} required value={setup.school_name} onChange={(e) => updateSetup('school_name', e.target.value)} placeholder="e.g. Blue Nile Academy" /></label>
+              <div className="walkthrough-fields-two"><label>Learner count<select name="school_size" required value={setup.school_size} onChange={(e) => updateSetup('school_size', e.target.value)}><option value="" disabled>Select range</option><option value="1-100">1–100</option><option value="101-500">101–500</option><option value="501-1500">501–1,500</option><option value="1501+">More than 1,500</option></select></label><label>Country or region<input name="region" required maxLength={80} value={setup.region} onChange={(e) => updateSetup('region', e.target.value)} placeholder="Ethiopia" /></label></div>
+              <div className="walkthrough-fields-two"><label>Timezone<select name="timezone" required value={setup.timezone} onChange={(e) => updateSetup('timezone', e.target.value)}><option value="Africa/Addis_Ababa">Addis Ababa</option><option value="Africa/Nairobi">Nairobi</option><option value="Africa/Kampala">Kampala</option><option value="Africa/Lagos">Lagos</option><option value="Africa/Cairo">Cairo</option><option value="Europe/London">London</option><option value="America/New_York">New York</option><option value="UTC">UTC</option></select></label><label>Default language<select name="default_language" value={setup.default_language} onChange={(e) => updateSetup('default_language', e.target.value)}><option value="en">English</option><option value="am">Amharic</option><option value="om">Afaan Oromo</option><option value="ti">Tigrinya</option><option value="sw">Swahili</option><option value="ar">Arabic</option><option value="fr">French</option></select></label></div>
+              <div className="priority-heading"><strong>What do you want to improve first?</strong><small>Choose one or more</small></div>
+              <div className="priority-options">{[['student-records','Learner records'],['curriculum','Curriculum'],['assessment','Assessment'],['learning-progress','Learning progress'],['staff-coordination','Staff coordination'],['academic-history','Academic history'],['family-communication','Family communication']].map(([value,title]) => <label className={'priority-option ' + (setup.priorities.includes(value) ? 'selected' : '')} key={value}><input type="checkbox" checked={setup.priorities.includes(value)} onChange={(e) => updateSetup('priorities', e.target.checked ? [...setup.priorities, value] : setup.priorities.filter((item) => item !== value))}/><span className="priority-check">{setup.priorities.includes(value) ? '✓' : '+'}</span><strong>{title}</strong></label>)}</div>
+              <label>Anything else? <span className="walkthrough-optional">Optional</span><textarea name="message" rows={3} maxLength={3000} value={setup.message} onChange={(e) => updateSetup('message', e.target.value)} placeholder="A challenge or goal for your school…" /></label>
+            </fieldset>}
+            {walkthroughStep === 1 && <fieldset className="wizard-step" data-wizard-step="1">
+              <legend><span>02 · SCHOOL CONTACT</span><strong>Who should we prepare access for?</strong><small>This person receives the administrator invitation after review.</small></legend>
+              <label>Your name<input name="name" autoComplete="name" minLength={2} maxLength={120} required value={setup.name} onChange={(e) => updateSetup('name', e.target.value)} placeholder="e.g. Hana Bekele" /></label>
+              <div className="walkthrough-fields-two"><label>Work email<input name="email" type="email" autoComplete="email" maxLength={254} required value={setup.email} onChange={(e) => updateSetup('email', e.target.value)} placeholder="you@school.org" /></label><label>Your role<input name="role" maxLength={80} required value={setup.role} onChange={(e) => updateSetup('role', e.target.value)} placeholder="School leader" /></label></div>
+              <label className="walkthrough-consent"><input name="contact_consent" type="checkbox" required checked={setup.contact_consent} onChange={(e) => updateSetup('contact_consent', e.target.checked)} /><span>FURII may contact me about setup. I have not included private learner information.</span></label>
+              <label className="walkthrough-honeypot" aria-hidden="true">Leave this field blank<input name="website" tabIndex={-1} autoComplete="off" value={setup.website} onChange={(e) => updateSetup('website', e.target.value)} /></label>
+              <div className="setup-review"><strong>{setup.school_name || 'Your school'}</strong><span>{setup.school_size || 'Learner count'} learners · {setup.region || 'Region'} · {setup.timezone.replace('Africa/','')}</span><small>Priorities: {setup.priorities.join(', ') || 'None selected'}</small></div>
+            </fieldset>}
             {walkthroughError && <p className="walkthrough-error" role="alert">{walkthroughError}</p>}
-            <button className="landing-button landing-button-primary walkthrough-submit" type="submit" disabled={walkthroughBusy}>{walkthroughBusy ? 'Sending…' : 'Request my walkthrough'} <span aria-hidden="true">→</span></button>
-            <small className="walkthrough-privacy">Your contact details are stored in the FURII School OS database for follow-up. Do not submit learner data.</small>
+            <div className="wizard-actions">{walkthroughStep > 0 && <button className="landing-button landing-button-quiet" type="button" onClick={() => { setWalkthroughError(''); setWalkthroughStep(0) }}>Back</button>}{walkthroughStep === 0 ? <button className="landing-button landing-button-primary walkthrough-submit" type="button" onClick={(event) => { const form = event.currentTarget.form; if (form) nextStep(form) }}>Continue <span aria-hidden="true">→</span></button> : <button className="landing-button landing-button-primary walkthrough-submit" type="submit" disabled={walkthroughBusy}>{walkthroughBusy ? 'Saving…' : 'Save my school setup'} <span aria-hidden="true">→</span></button>}</div>
+            <small className="walkthrough-privacy">No learner records are requested. A FURII operator reviews each request before activating the school workspace.</small>
           </form>}
         </Reveal>
       </section>
 
       <section className="landing-final">
         <div className="final-orbit" />
-        <Reveal><p className="landing-kicker">MAKE THE NEXT SCHOOL DAY CLEARER</p><h2>Give your school one place<br />to move learning forward.</h2><p>Talk with us about a starting point that fits your school.</p><a className="landing-button landing-button-primary" href="#walkthrough">Request a walkthrough <span aria-hidden="true">↓</span></a></Reveal>
+        <Reveal><p className="landing-kicker">MAKE THE NEXT SCHOOL DAY CLEARER</p><h2>Give your school one place<br />to move learning forward.</h2><p>Talk with us about a starting point that fits your school.</p><a className="landing-button landing-button-primary" href="#walkthrough">Set up your school <span aria-hidden="true">↓</span></a></Reveal>
         <div className="final-aside"><span>F</span><small>FURII SCHOOL OS<br />MADE FOR LEARNING</small></div>
       </section>
     </main>

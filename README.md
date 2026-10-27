@@ -1,6 +1,6 @@
 # FURII School OS
 
-Single-school, assessment-first school platform. The first release focuses on secure school setup, student academic history, online assessments, and explainable learning recommendations.
+School-scoped, assessment-first school platform. The first pilot can start with one school; new school workspaces are created through a reviewed setup request and one-time administrator invitation.
 
 ## Repository layout
 
@@ -27,7 +27,7 @@ School administrators can invite teachers and learners using single-use, seven-d
 
 ## Walkthrough requests
 
-The public landing page accepts school walkthrough requests through `POST /api/v1/demo-requests`. The API stores only the contact and school context in `public.demo_requests`; the table has RLS enabled and no Supabase Data API grants or policies. The product inbox is available at `/admin/demo-requests` only to school administrators whose email is listed in Render's comma-separated `DEMO_REQUEST_ADMIN_EMAILS` variable. Set that variable in the `furii-school-api` service to the exact operator email(s), then redeploy the API. Requests are limited to 100 inbox rows and repeat submissions from one email are throttled for ten minutes.
+The landing page collects school name, learner-count band, region, timezone, language, priorities, and the intended administrator contact through a two-step setup wizard. POST /api/v1/demo-requests stores this prospect data in public.demo_requests; do not submit learner records. The table has RLS enabled and no Supabase Data API grants or policies. A configured FURII product operator reviews requests in /admin/demo-requests and can prepare a school once. Preparation creates the school, saves the choices in school_setup_profiles, and returns a hashed-at-rest, seven-day, one-time school-administrator invitation token. The operator must copy and share the link privately; this repo has no email delivery service. After the admin accepts the invite and signs in, School Profile shows the saved learner count, region, and priorities, while school name, timezone, and default language are prefilled. The inbox is restricted to school administrators whose email is listed in Render's comma-separated DEMO_REQUEST_ADMIN_EMAILS variable. Set that variable in furii-school-api to the exact operator email(s), then redeploy the API. Requests are limited to 100 inbox rows and repeat submissions from one email are throttled for ten minutes.
 
 ## Production web and API connection
 
