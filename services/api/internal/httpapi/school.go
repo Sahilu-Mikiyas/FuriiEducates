@@ -54,6 +54,7 @@ func (a *API) registerSchoolRoutes(mux *http.ServeMux) {
 	a.registerReviewRoutes(mux)
 	a.registerIntelligenceRoutes(mux)
 	a.registerDemoRequestRoutes(mux)
+	a.registerOperationsRoutes(mux)
 	mux.HandleFunc("GET /api/v1/school", a.admin(a.getSchool))
 	mux.HandleFunc("GET /api/v1/school/setup-profile", a.admin(a.getSchoolSetupProfile))
 	mux.HandleFunc("GET /api/v1/school/learning-summary", a.admin(a.getSchoolLearningSummary))
