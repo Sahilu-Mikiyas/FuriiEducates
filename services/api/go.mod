@@ -1,8 +1,6 @@
 module github.com/furii/school-os/services/api
 
-go 1.26.0
-
-toolchain go1.27.3
+go 1.27.3
 
 require (
 	github.com/jackc/pgx/v5 v5.12.0

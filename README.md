@@ -13,7 +13,7 @@ School-scoped, assessment-first school platform. The first pilot can start with 
 
 ## Local development
 
-Requirements: Go 1.26+ (the pinned 1.27.3 toolchain downloads automatically), Node.js 20.19+ or 22.12+, npm, and Docker Compose or another PostgreSQL 17 server.
+Requirements: Go 1.27.3+ (any Go 1.21+ downloads it automatically; older patch releases have standard-library vulnerabilities), Node.js 20.19+ or 22.12+, npm, and Docker Compose or another PostgreSQL 17 server.
 
 1. Copy `.env.example` to `.env` as a reference and set a long random `SESSION_HASH_KEY` (at least 32 bytes). Export its values in the shell running the Go commands; the API does not load dotenv files.
 2. Start PostgreSQL with `docker compose up -d db`.
