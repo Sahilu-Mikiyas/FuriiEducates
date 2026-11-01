@@ -36,27 +36,7 @@ func (a *API) registerOperationsRoutes(mux *http.ServeMux) {
 }
 
 func (a *API) authenticated(next func(http.ResponseWriter, *http.Request, auth.Identity)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(cookieName)
-		if err != nil {
-			writeError(w, 401, "UNAUTHENTICATED", "Authentication is required.", nil)
-			return
-		}
-		id, err := a.auth.Identity(r.Context(), cookie.Value)
-		if err != nil {
-			if errors.Is(err, auth.ErrUnauthenticated) {
-				writeError(w, 401, "UNAUTHENTICATED", "Authentication is required.", nil)
-			} else {
-				a.serverError(w, r, err)
-			}
-			return
-		}
-		if !hasRole(id.Roles, "school_admin") && !hasRole(id.Roles, "teacher") && !hasRole(id.Roles, "student") {
-			writeError(w, 403, "FORBIDDEN", "This account cannot access teaching resources.", nil)
-			return
-		}
-		next(w, r, id)
-	}
+	return a.requireRole(next, "This account cannot access teaching resources.", "school_admin", "teacher", "student")
 }
 
 type financeEntry struct {

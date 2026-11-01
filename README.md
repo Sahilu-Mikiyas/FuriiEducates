@@ -9,17 +9,28 @@ School-scoped, assessment-first school platform. The first pilot can start with 
 - `apps/web`: React, Vite, and TypeScript application
 - `api-spec/openapi.yaml`: REST API contract
 - `docs`: architecture and operational decisions
-- `infrastructure/docker`: local PostgreSQL service
+- `compose.yaml`: local PostgreSQL service
 
 ## Local development
 
-Requirements: Go 1.23+, Node.js 20+, npm, and Docker Compose.
+Requirements: Go 1.26+ (the pinned 1.27.3 toolchain downloads automatically), Node.js 20.19+ or 22.12+, npm, and Docker Compose or another PostgreSQL 17 server.
 
 1. Copy `.env.example` to `.env` as a reference and set a long random `SESSION_HASH_KEY` (at least 32 bytes). Export its values in the shell running the Go commands; the API does not load dotenv files.
 2. Start PostgreSQL with `docker compose up -d db`.
-3. Run migrations from `services/api`: `go run github.com/pressly/goose/v3/cmd/goose@v3.24.1 -dir migrations postgres "$DATABASE_URL" up`.
-4. Start the API from `services/api`: `go run ./cmd/api`.
-5. Start the web application from `apps/web`: `npm install` then `npm run dev`.
+3. Start the API from `services/api`: `go run ./cmd/api`. The API applies any pending migrations in `services/api/migrations` before it starts serving, under an advisory lock, and refuses to start if a migration fails.
+4. Start the web application from `apps/web`: `npm ci` then `npm run dev`.
+
+## Tests
+
+Run the API tests from `services/api`:
+
+```sh
+go test ./...
+```
+
+Unit tests always run. Database integration tests run only when `TEST_DATABASE_URL` points at a PostgreSQL superuser connection, for example the Compose database: `TEST_DATABASE_URL=postgres://furii:furii-dev-only@localhost:5432/furii?sslmode=disable go test ./...`. The suite creates a fresh database for each run, applies every migration, exercises the real HTTP handlers, and drops the database afterwards. Set `FURII_TEST_KEEP_DB=1` to keep it, or `FURII_TEST_LOG=1` to print API server logs. CI runs the same suite, plus gofmt, go vet, govulncheck, and npm audit.
+
+Tests marked as skipped document known issues from [the system analysis](docs/system-analysis.md); remove the skip when the issue is fixed.
 
 The API exposes health and authentication endpoints plus administrator workflows for school settings, academic years, classes, students, historical academic records, external examinations, curriculum versions, subject skill trees, and a reusable question bank. Academic history CSV uploads are previewed with row-level validation before a single atomic commit. Questions support single choice, multiple choice, numeric, and text answer types; publishing requires source and licensing notes plus skill-tag weights that sum to 1. Answer keys remain server-side and are omitted from question responses. Add only curriculum content approved for use by your school. Provision the first school administrator once with `BOOTSTRAP_SCHOOL_NAME`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_NAME`, and `BOOTSTRAP_ADMIN_PASSWORD` set in the environment, then run `go run ./cmd/bootstrap` from `services/api`. The bootstrap command refuses to run after a school exists, and public signup is not enabled. Production deployments must use HTTPS, set `COOKIE_SECURE=true`, restrict database access, and protect backups and secrets.
 

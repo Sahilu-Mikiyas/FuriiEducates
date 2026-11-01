@@ -270,4 +270,3 @@ func baselineVerifiedSupabaseMigrations(ctx context.Context, conn *pgxpool.Conn)
 	}
 	return nil
 }
-

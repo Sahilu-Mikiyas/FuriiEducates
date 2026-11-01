@@ -32,7 +32,7 @@ Implemented in this branch:
 
 Required before a real-student pilot:
 
-1. Apply migrations `00004` through `00009` to Supabase in order, then deploy the same revision to Render and Vercel.
+1. Deploy the same revision to Render and Vercel. The API applies pending migrations at startup; confirm the Render log shows no migration error.
 2. Confirm `/healthz`, sign-in, student invitation, assessment start/save/reconnect/submit, deadline enforcement, teacher written grading, and result release using synthetic records.
 3. Verify school and class isolation with separate test accounts, review the access-control policy, and confirm account deactivation/session revocation behavior.
 4. Confirm Supabase backup retention and complete a documented restore rehearsal; assign an operational owner for incidents and data corrections.

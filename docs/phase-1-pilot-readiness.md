@@ -32,7 +32,7 @@ This checklist prepares the first FURII School OS pilot after the initial Render
 
 - [ ] Verify Supabase backup availability and retention for the selected plan.
 - [ ] Create or identify a restore point before the pilot, and document who can restore it.
-- [ ] Document the migration procedure for applying SQL files in `services/api/migrations` before deploying schema changes.
+- [ ] Confirm the API applied pending migrations on its last deploy (the Render log shows no migration error) and take a restore point before deploying schema changes.
 - [ ] Confirm the Supabase project is active and its database password in Render matches the current Supabase password.
 - [ ] Record the Render free-instance sleep behavior and expected wake-up delay; decide whether the pilot needs always-on hosting.
 

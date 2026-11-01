@@ -2,11 +2,13 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -168,4 +170,59 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, code, message string, fields map[string]string) {
 	writeJSON(w, status, map[string]any{"error": map[string]any{"code": code, "message": message, "fields": fields}})
+}
+
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// requireRole resolves the session cookie into an identity, checks that the
+// identity holds at least one of the allowed roles, and rejects malformed
+// route identifiers before the handler queries the database.
+func (a *API) requireRole(next func(http.ResponseWriter, *http.Request, auth.Identity), forbiddenMessage string, allowed ...string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie(cookieName)
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication is required.", nil)
+			return
+		}
+		identity, err := a.auth.Identity(r.Context(), cookie.Value)
+		if err != nil {
+			if errors.Is(err, auth.ErrUnauthenticated) {
+				writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication is required.", nil)
+			} else {
+				a.serverError(w, r, err)
+			}
+			return
+		}
+		permitted := false
+		for _, role := range allowed {
+			if hasRole(identity.Roles, role) {
+				permitted = true
+				break
+			}
+		}
+		if !permitted {
+			writeError(w, http.StatusForbidden, "FORBIDDEN", forbiddenMessage, nil)
+			return
+		}
+		if !pathIDsValid(r) {
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "The requested record was not found.", nil)
+			return
+		}
+		next(w, r, identity)
+	}
+}
+
+// pathIDsValid reports whether every wildcard in the matched route pattern is
+// a UUID. All route identifiers in this API are UUIDs.
+func pathIDsValid(r *http.Request) bool {
+	for _, segment := range strings.Split(r.Pattern, "/") {
+		if !strings.HasPrefix(segment, "{") || !strings.HasSuffix(segment, "}") {
+			continue
+		}
+		name := strings.TrimSuffix(strings.TrimSuffix(strings.TrimPrefix(segment, "{"), "}"), "...")
+		if !uuidPattern.MatchString(r.PathValue(name)) {
+			return false
+		}
+	}
+	return true
 }

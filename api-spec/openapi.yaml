@@ -99,6 +99,12 @@ paths:
         '400': { description: Invalid request ID or status }
         '403': { description: The school administrator is not on the product inbox allowlist }
         '404': { description: Request not found }
+  /platform/demo-requests/{requestID}/prepare:
+    parameters:
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
     post:
       summary: Prepare a school and create its first administrator invitation
       description: Requires a school-admin session and an email in DEMO_REQUEST_ADMIN_EMAILS. Creates the school and setup profile in one transaction, returns a seven-day one-time token once, and marks the request as contacted.
@@ -633,9 +639,293 @@ paths:
       responses:
         '200': { description: Class-scoped learner skill evidence }
         '403': { description: Teacher is not assigned to the class }
+  /staff:
+    get:
+      summary: List teacher accounts and their assigned class IDs
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Teachers in the administrator's school }
+        '403': { description: School administrator required }
+  /staff/{staffID}:
+    parameters:
+      - { name: staffID, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Enable or disable a teacher account
+      description: Disabling revokes every active session for that teacher.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [active, disabled] }
+      responses:
+        '200': { description: Status updated }
+        '404': { description: Teacher not found in this school }
+  /staff/invitations:
+    get:
+      summary: List pending, unexpired staff invitations
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Pending invitations }
+    post:
+      summary: Invite a teacher
+      description: Returns a seven-day, single-use token once. Share the link privately; there is no email delivery.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, maxLength: 254 }
+      responses:
+        '201': { description: Invitation created, including the one-time token }
+        '409': { description: An account or pending invitation already uses this email }
+  /staff/invitations/{invitationID}/revoke:
+    parameters:
+      - { name: invitationID, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Revoke a pending staff invitation
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Invitation revoked }
+        '404': { description: Pending invitation not found }
+  /staff/invitations/accept:
+    post:
+      summary: Accept a teacher or school administrator invitation
+      description: Public endpoint. Creates the account with the role stored on the invitation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, display_name, password]
+              properties:
+                token: { type: string, minLength: 32, maxLength: 128 }
+                display_name: { type: string, maxLength: 200 }
+                password: { type: string, minLength: 12, maxLength: 1024 }
+      responses:
+        '201': { description: Account created }
+        '400': { description: Invalid, expired, or used invitation }
+        '409': { description: An account already uses this email }
+  /classes/{classID}/teachers:
+    parameters:
+      - { name: classID, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Assign an active teacher to a class
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [teacher_id]
+              properties:
+                teacher_id: { type: string, format: uuid }
+      responses:
+        '200': { description: Teacher assigned (idempotent) }
+        '404': { description: Class or active teacher not found in this school }
+  /teacher/classes:
+    get:
+      summary: List the signed-in teacher's assigned classes
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Assigned classes }
+        '403': { description: Teacher account required }
+  /teacher/classes/{classID}/students:
+    parameters:
+      - { name: classID, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: List active students in an assigned class
+      description: Returns an empty list for classes not assigned to the teacher.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Class roster }
+  /teacher/lesson-plans:
+    get:
+      summary: List the signed-in teacher's lesson plans
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Lesson plans, newest lesson date first }
+    post:
+      summary: Create a lesson plan for an assigned class
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LessonPlanInput' }
+      responses:
+        '200': { description: Plan saved }
+        '400': { description: Invalid plan }
+        '403': { description: Class is not assigned to this teacher }
+  /teacher/lesson-plans/{planID}:
+    parameters:
+      - { name: planID, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Read one of the signed-in teacher's lesson plans
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Lesson plan }
+        '404': { description: Not found }
+    put:
+      summary: Update a draft or returned lesson plan
+      description: Only plans in draft or needs_revision status can be edited. Saving clears any previous review.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LessonPlanInput' }
+      responses:
+        '200': { description: Plan saved }
+        '404': { description: Editable plan not found }
+  /lesson-plans:
+    get:
+      summary: List lesson plans across the school for administrator review
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Lesson plans with teacher and class names }
+  /lesson-plans/{planID}/review:
+    parameters:
+      - { name: planID, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Approve a submitted lesson plan or return it for revision
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [approved, needs_revision] }
+      responses:
+        '200': { description: Plan reviewed }
+        '404': { description: Submitted plan not found }
+  /teacher/classes/{classID}/resources:
+    parameters:
+      - { name: classID, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: List resources shared with an assigned class
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Resource metadata }
+        '403': { description: Class is not assigned to this teacher }
+    post:
+      summary: Upload a class resource (up to 15 MB)
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                title: { type: string, maxLength: 200 }
+                description: { type: string }
+                subject: { type: string }
+      responses:
+        '201': { description: Resource stored }
+        '403': { description: Class is not assigned to this teacher }
+        '413': { description: File is larger than 15 MB }
+  /student/resources:
+    get:
+      summary: List resources shared with the signed-in student's active classes
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Resource metadata }
+  /resources/{resourceID}/download:
+    parameters:
+      - { name: resourceID, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Download a class resource
+      description: Allowed for school administrators, teachers assigned to the class, and students actively enrolled in it.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: File content as an attachment }
+        '403': { description: Not shared with this account }
+        '404': { description: Resource not found }
+  /finance/entries:
+    get:
+      summary: List the latest 500 finance ledger entries
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Ledger entries }
+    post:
+      summary: Record a tuition charge, payment, expense, or salary entry
+      description: Records activity only; it does not move money. Entries cannot yet be edited or voided after creation.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entry_type, category, description, amount_minor, currency_code, status]
+              properties:
+                entry_type: { type: string, enum: [tuition_charge, payment, expense, salary] }
+                category: { type: string, maxLength: 80 }
+                description: { type: string, maxLength: 500 }
+                amount_minor: { type: integer, minimum: 1, maximum: 1000000000000 }
+                currency_code: { type: string, enum: [ETB, USD, EUR] }
+                student_id: { type: [string, 'null'], format: uuid, description: Required for tuition charges and payments }
+                staff_user_id: { type: [string, 'null'], format: uuid, description: Required for salary entries }
+                due_on: { type: [string, 'null'], format: date }
+                paid_on: { type: [string, 'null'], format: date }
+                status: { type: string, enum: [recorded, paid, void] }
+                reference: { type: string }
+      responses:
+        '201': { description: Entry recorded }
+        '400': { description: Invalid entry }
+  /finance/summary:
+    get:
+      summary: Ledger totals in ETB minor units
+      description: Entries in other currencies are not included yet.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Totals for tuition, payments, expenses, salaries, and outstanding charges }
 components:
   securitySchemes:
     sessionCookie:
       type: apiKey
       in: cookie
       name: furii_session
+  schemas:
+    LessonPlanInput:
+      type: object
+      required: [class_id, subject, lesson_date, duration_minutes, topic, objectives]
+      properties:
+        class_id: { type: string, format: uuid }
+        subject: { type: string }
+        lesson_date: { type: string, format: date }
+        duration_minutes: { type: integer, minimum: 5, maximum: 480 }
+        topic: { type: string, maxLength: 200 }
+        objectives: { type: string, maxLength: 5000 }
+        prior_knowledge: { type: string }
+        materials: { type: string }
+        lesson_phases:
+          type: array
+          maxItems: 12
+          items:
+            type: object
+            properties:
+              phase: { type: string }
+              minutes: { type: integer, minimum: 0 }
+              activities: { type: string, maxLength: 2000 }
+        differentiation: { type: string }
+        assessment: { type: string }
+        homework: { type: string }
+        reflection: { type: string }
+        status: { type: string, enum: [draft, submitted], default: draft }

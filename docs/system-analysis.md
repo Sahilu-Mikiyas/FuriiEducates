@@ -1,0 +1,186 @@
+# FURII School OS — full system analysis
+
+Analysis date: 2026-10-31. Revision analysed: `5d0bfc1` (main, after PR #8 "finance, lesson plans, and class resources").
+
+Method: every tracked source file was read (Go API, SQL migrations, React app, CI, deploy config, docs). The API and web app were built locally, `go vet` and `govulncheck` were run, `npm audit` was run, and the live deployment was probed with read-only requests.
+
+This document is the working roadmap. Update it as items are fixed.
+
+## Progress log
+
+**2026-11-01 — Phase 0 (safety net) completed, uncommitted on main.**
+
+- Test suite added: unit tests for grading, question validation, CSV numbers, passwords, and config, plus database integration tests covering authentication, role boundaries, malformed IDs, school isolation, teacher class scoping, the full assessment lifecycle, and deadline handling. Known issues P0-1 and P0-4 have skipped tests waiting for their fixes.
+- The tests found two production bugs in the exam flow, both fixed:
+  - **Autosave always failed** with HTTP 500 because the idempotency-key query compared a UUID column with an empty string. Submission still worked because the browser resends every answer, but a deadline auto-submit keeps only server-saved answers, so timed-out students lost all their work.
+  - **Submission could fail** with HTTP 500 because one parameter was inferred as two different types. The idempotency key is now validated as a UUID.
+- P0-5 fixed: pgx 5.12.0, x/text 0.43.0, x/crypto 0.58.0, Go toolchain pinned to 1.27.3, npm versions pinned. `govulncheck` reports 0 reachable vulnerabilities.
+- P1-2 fixed: malformed route IDs return 404, and malformed IDs in request bodies return 400. The four copy-pasted role guards were merged into one.
+- CI now checks module tidiness, gofmt, go vet, govulncheck, the test suite against Postgres, and npm audit.
+- README, OpenAPI spec (all 78 routes), and migration docs refreshed. Three Go files were gofmt-formatted.
+
+Next: Phase 1 (security and tenancy).
+
+---
+
+## 1. What the system is today
+
+| Layer | Technology | Where | Notes |
+|---|---|---|---|
+| Frontend | React 19, Vite 8, TypeScript 7 | `apps/web`, hosted on Vercel (`furii-educates.vercel.app`) | Single-page app; marketing landing at `/`, workspace at `/login` and `/admin/*` |
+| API | Go `net/http`, pgx v5 | `services/api`, hosted on Render free tier (`furii-school-api.onrender.com`) | Modular monolith, about 4,000 lines, 79 routes |
+| Database | PostgreSQL on Supabase | `services/api/migrations` (13 migrations) | Migrations auto-run at API start via `migrations/runner.go` |
+| CI | GitHub Actions | `.github/workflows/ci.yml` | Builds API, migrates a fresh Postgres, curl smoke test of the admin flow, builds web |
+
+### Roles and what each can do
+
+- **Platform operator** (a school admin whose email is in `DEMO_REQUEST_ADMIN_EMAILS`): reviews landing-page setup requests and prepares new schools with a one-time admin invite link.
+- **School admin**: school profile, academic years, classes, students, academic history (manual and CSV), curriculum and question bank, assessments, staff invites and class assignment, learner invites, finance ledger, lesson-plan review.
+- **Teacher**: class rosters, skill-mastery overview, grading of written answers, lesson plans, uploading class resources.
+- **Student**: assigned assessments (timed, autosave with IndexedDB recovery), results, skill mastery and recommendations, class resources.
+- **Parent**: role exists in the database only. No features.
+
+### Core flows
+
+1. **Onboarding.** A prospect submits the landing form. The operator clicks "Prepare school", which creates a school and a pending admin invitation. The operator copies the link by hand because there is no email service. The admin accepts and signs in.
+2. **Assessment loop.** The admin creates curriculum skills, writes questions with a JSON answer key, publishes them, builds an assessment, publishes it, and assigns it to a class. The student starts, which snapshots the questions and sets a server deadline. Answers autosave. On submit, objective answers are auto-graded and written answers go to the assigned teacher. Results release when every written answer is graded. Auto-graded, skill-tagged answers update mastery estimates and recommendations.
+3. **Auth.** Email and password (Argon2id). An opaque session token sits in an HttpOnly cookie, and only its HMAC digest is stored in `sessions`. Invitations use 256-bit tokens passed in the URL fragment.
+
+### What is genuinely good
+
+- Sound security fundamentals: Argon2id, hashed session and invite tokens, server-side answer keys, composite `(id, school_id)` foreign keys on most tenant tables, RLS enabled and Supabase API roles revoked.
+- A thoughtful exam engine: immutable question snapshots, server deadlines, answer revisions, idempotency keys, an IndexedDB retry queue.
+- Audit log entries on most admin mutations.
+- A migration runner with an advisory lock and per-migration transactions.
+- A CI smoke test that exercises a real database.
+
+---
+
+## 2. Problems, ranked
+
+- **P0**: must be fixed before any real school or real student data.
+- **P1**: correctness or data-integrity bugs users will hit.
+- **P2**: maintainability, operations, and product gaps.
+
+### P0 — security and trust
+
+**P0-1. Curriculum data is shared across all schools.**
+`curricula`, `subjects`, `curriculum_nodes` and `curriculum_mappings` have no `school_id` (`migrations/00003_curriculum_question_bank.sql`). Every handler in `internal/httpapi/curriculum.go` reads and writes them without a school filter. Onboarding now creates multiple schools, so any school admin can read every other school's curricula, add subjects and nodes to them, and overwrite their mappings through `ON CONFLICT ... DO UPDATE`. Question skill tags and mastery records can point at another school's nodes. The unique key on provider, name, version and language also stops a second school from creating the same official curriculum.
+Fix: add `school_id`, nullable only for a platform-owned read-only "official library". Backfill it from `audit_logs`, scope every query, validate skill tags against the school, and add tenant-isolation tests.
+
+**P0-2. Login depends on third-party cookies.**
+The frontend (vercel.app) and the API (onrender.com) are different sites, so the session cookie is `SameSite=None` (`internal/httpapi/http.go:80`). Safari and every iOS browser block third-party cookies, so sign-in will appear to work and then fail on the next request. Firefox partitions them, which breaks the plain-link resource download in `operations-ui.tsx`.
+Fix: add a Vercel rewrite from `/api/:path*` to the Render API, build with an empty `VITE_API_BASE_URL`, and switch the cookie to `SameSite=Lax`. Add an explicit CSRF check on unsafe methods. Long term, serve the API from a subdomain of the product domain.
+
+**P0-3. No password reset and no change-password.**
+Nothing in the API or UI lets a user change or recover a password. A forgotten admin password means editing the database directly. A disabled teacher cannot be re-invited because emails are now globally unique.
+Fix: an admin-initiated reset link using the existing invite token pattern, a self-service change-password, and email-based reset once email delivery exists.
+
+**P0-4. Exam integrity gaps.**
+- `GET /student/assessments/{id}` returns every question before the attempt starts (`internal/httpapi/learner.go:307`). A student can read the whole exam and only then start the timer.
+- Abandoned attempts are never finalized. If a student closes the tab, the attempt stays `in_progress` forever, with no score, no mastery update, and nothing visible to teachers. Only the browser auto-submits.
+- The browser auto-submit fires exactly at the deadline (`apps/web/src/main.tsx:519`). By then the server ignores the submitted payload, so answers still syncing are lost.
+- `due_at` exists in the schema, but no API or UI sets it, so assessments never close.
+
+Fix: return questions only after start, add a server-side finalizer (a ticker in the API or finalize-on-read) that grades expired attempts, allow a short server grace window, and add due dates to assignments.
+
+**P0-5. Vulnerable and unpinned dependencies.**
+`govulncheck` reports 4 reachable issues:
+- `github.com/jackc/pgx/v5` 5.7.2 has a SQL-injection advisory involving dollar-quoted strings, fixed in 5.9.2.
+- `golang.org/x/text` 0.21.0 has two issues, fixed in 0.41.0.
+- A standard-library `crypto/x509` issue depends on the Go version Render builds with.
+
+`go.mod` has no `toolchain` line, so Render chooses the Go version. `apps/web/package.json` declares every dependency as `"latest"`.
+Fix: bump pgx and x/text, add a `toolchain` line, pin exact npm versions, and add `govulncheck` and `npm audit` to CI.
+
+**P0-6. No rate limiting.**
+Login, invitation acceptance, and the public demo-request form have no per-IP limits. The demo form only throttles per email, so random emails bypass it.
+Fix: an in-memory per-IP token bucket, which is enough for one instance, plus backoff on repeated failed logins.
+
+**P0-7. No automated tests.**
+The repository has no `_test.go` files and no frontend tests. CI only smoke-tests admin happy paths. Nothing checks school isolation, teacher class scoping, or the exam flow.
+Fix: Go integration tests against the CI Postgres service, starting with tenant isolation and the assessment lifecycle. Add one Playwright end-to-end test for invite, start, save, submit and grade.
+
+### P1 — correctness and data integrity
+
+1. **Silent list truncation.** Students, classes, questions, assessments and other lists are capped at 200 or 500 rows with no pagination (for example `school.go:279`). A school with more than 200 students loses rows in the UI, and the overview's student count is wrong.
+2. **Malformed IDs return HTTP 500.** Postgres error `22P02` is not mapped in `databaseError` (`school.go:430`), so a bad UUID in a URL is logged as a server failure.
+3. **Only assigned teachers can grade written answers.** If a class has no teacher, results are never released. Admins need a grading fallback.
+4. **No gradebook.** Neither admins nor teachers can see per-student assessment scores. Admins only see a school-wide average.
+5. **Most records cannot be edited or removed.** Missing actions:
+   - edit or archive classes and academic years;
+   - enroll an existing student or move them between classes;
+   - edit, delete or verify academic records (`verification_status` is always `unverified`);
+   - archive published questions and edit assessments;
+   - unassign teachers, void finance entries, delete resources.
+6. **Deactivating a student** leaves their login active and their enrollments untouched.
+7. **CSV import.** Excel's UTF-8 byte-order mark breaks the header check. Re-importing a file duplicates every record. Preview and commit run one query per row.
+8. **Finance currency.** USD and EUR entries can be recorded, but the summary sums only ETB and the UI labels every amount ETB.
+9. **Teacher learning profile** returns one row per student per skill, capped at 500 rows, so large classes are truncated.
+10. **Email uniqueness.** Invites check the email only within the school, but migration 00012 made emails globally unique. The conflict appears only when the invitee tries to accept.
+11. **Score totals** use live `assessment_items` instead of the attempt snapshot (`learner.go:643`, `reviews.go:152`).
+12. **Mastery history** inserts a snapshot for every skill on every submission. Accepted recommendations get "superseded" without any outcome recorded.
+13. **Smaller API inconsistencies.**
+    - The start-attempt response is not wrapped in the usual `{data: ...}` envelope.
+    - `listSchoolLessonPlans` and `writeResources` skip the `rows.Err()` check.
+    - Admins cannot list a class's resources because the route uses the teacher guard.
+    - Lesson-plan review has no comment field and writes no audit entry.
+
+### P2 — architecture, operations, and product gaps
+
+**Frontend structure.**
+`apps/web/src/main.tsx` is 90 KB. It holds one `App` component with about 40 `useState` hooks, renders every admin page and hides the inactive ones, and has many lines over 1,000 characters. There is no router, and `operations-ui.tsx` duplicates the API client. Every feature touches this file, which is the biggest drag on development speed.
+Target: a router, one component per page, a shared typed API client (ideally generated from OpenAPI), and a data-fetching layer such as TanStack Query.
+
+**Backend structure.**
+SQL is written inline in HTTP handlers, although `docs/architecture.md` describes domain services that do not exist. The auth guard is copy-pasted four times, and every request runs two queries to resolve identity and roles.
+Target: one middleware that resolves identity once and stores it in the request context, small role-check wrappers, and a domain package per area.
+
+**Operations.**
+- The Render free tier took 33 seconds to answer the first request during this analysis. Schools will read that as "the site is broken".
+- Teaching files up to 15 MB are stored as `bytea` in Postgres. Each download loads the whole file into memory, and the files count against the Supabase database size limit. They belong in Supabase Storage or S3 behind signed URLs.
+- There is no request logging, metrics, or error tracking. Expired sessions are never deleted.
+- There is no email delivery. Every invite link is copied by hand.
+- The frontend sends no CSP, `X-Frame-Options` or `Referrer-Policy` headers.
+
+**Docs and contract drift.**
+- `api-spec/openapi.yaml` is missing 23 live routes (staff, finance, lesson plans, resources, teacher classes) and lists one route that does not exist.
+- The README references an `infrastructure/docker` folder that does not exist.
+- `docs/staff-invitations-migration.md` still tells operators to paste SQL into the Supabase editor, though the API now migrates itself.
+- Three Go files are not gofmt-clean, and CI runs `go mod tidy`, which mutates files, instead of verifying them.
+
+**Product and UX.**
+- Every school admin sees the "School setup requests" page, which then fails with a 403 error.
+- The topbar's "All changes saved" indicator is static text.
+- After accepting an invite, "Continue to sign in" leads to the marketing page instead of `/login`.
+- Question authoring needs a raw JSON answer key typed by hand, and only admins can author questions or assessments.
+- A user who is both admin and teacher only ever sees the teacher workspace.
+- There is no Amharic or other localisation, although each school sets a default language.
+- Platform operators are ordinary school admins plus an environment variable, which mixes tenant and platform administration.
+
+---
+
+## 3. How it should work (target state)
+
+- **Same-site API.** Served behind the Vercel domain, with `SameSite=Lax` cookies, a CSRF check, rate limits, and password reset.
+- **Strict tenancy.** Every tenant row carries `school_id`, enforced by composite foreign keys and covered by isolation tests. Any platform-owned curriculum library is read-only to schools.
+- **Server-authoritative exams.** Questions stay hidden before start. A background finalizer grades expired attempts. Submissions get a short grace window, assignments have due dates, admins can grade when no teacher is assigned, and teachers and admins have a gradebook.
+- **Complete record management.** Pagination everywhere, edit and archive for every core entity, enrollment management, and correctable finance through void and reversal entries.
+- **Maintainable code.** A routed, componentised frontend. Shared middleware and domain packages in Go. An OpenAPI spec kept in sync and used to generate the client.
+- **Operable service.** Always-on hosting for pilots, object storage for files, structured request logs, error tracking, email delivery, and a rehearsed backup restore.
+
+---
+
+## 4. Recommended order of work
+
+Nothing new should be built until Phases 0 and 1 are done. They protect every later change.
+
+| Phase | Goal | Items |
+|---|---|---|
+| **0. Safety net** | Make change safe | Test harness with first isolation and exam tests (P0-7). gofmt, vet, govulncheck and npm audit in CI. Bump pgx and x/text, pin the Go toolchain and npm versions (P0-5). Map `22P02` to 404. Refresh README, OpenAPI and stale docs. |
+| **1. Security and tenancy** | Safe for a real school | Curriculum scoping migration (P0-1). Same-origin API proxy, Lax cookies, CSRF check (P0-2). Rate limits (P0-6). Password change and admin reset (P0-3). Session cleanup. Hide the setup-requests page from non-operators. |
+| **2. Exam correctness** | Trustworthy assessments | Hide questions before start, server finalizer, grace window, due dates (P0-4). Admin grading fallback. Gradebook. Snapshot-based totals. |
+| **3. Frontend restructure** | Faster feature work | Router and per-page components, shared API client, data-fetching layer. Do this once the Phase 0 end-to-end test exists. |
+| **4. Record completeness** | Usable day to day | Pagination. Edit and archive for classes, years, enrollments, records, questions and assessments. Teacher unassign. Finance void and multi-currency. CSV fixes. Student deactivation side effects. |
+| **5. Operations** | Ready for a pilot | Paid Render instance or keep-warm. Files to object storage. Logging and error tracking. Email delivery for invites and resets. Backup restore rehearsal. Security headers. |
+| **6. Product growth** | Beyond the pilot | Teacher question and assessment authoring with a friendly answer-key editor. Localisation. Parent role. Analytics. |

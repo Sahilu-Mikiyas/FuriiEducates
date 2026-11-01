@@ -13,27 +13,7 @@ import (
 )
 
 func (a *API) admin(next func(http.ResponseWriter, *http.Request, auth.Identity)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(cookieName)
-		if err != nil {
-			writeError(w, 401, "UNAUTHENTICATED", "Authentication is required.", nil)
-			return
-		}
-		identity, err := a.auth.Identity(r.Context(), cookie.Value)
-		if err != nil {
-			if errors.Is(err, auth.ErrUnauthenticated) {
-				writeError(w, 401, "UNAUTHENTICATED", "Authentication is required.", nil)
-			} else {
-				a.serverError(w, r, err)
-			}
-			return
-		}
-		if !hasRole(identity.Roles, "school_admin") {
-			writeError(w, 403, "FORBIDDEN", "This action requires a school administrator.", nil)
-			return
-		}
-		next(w, r, identity)
-	}
+	return a.requireRole(next, "This action requires a school administrator.", "school_admin")
 }
 
 func hasRole(roles []string, expected string) bool {
@@ -436,6 +416,10 @@ func (a *API) databaseError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.As(err, &pgErr) {
 		if pgErr.Code == "23505" {
 			writeError(w, 409, "CONFLICT", "A record with the same identifier already exists.", nil)
+			return
+		}
+		if pgErr.Code == "22P02" {
+			writeError(w, 400, "VALIDATION_ERROR", "An identifier or value has an invalid format.", nil)
 			return
 		}
 		if pgErr.Code == "23503" || pgErr.Code == "23514" {

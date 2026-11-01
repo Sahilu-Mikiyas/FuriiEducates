@@ -32,27 +32,7 @@ func (a *API) registerLearnerRoutes(mux *http.ServeMux) {
 }
 
 func (a *API) student(next func(http.ResponseWriter, *http.Request, auth.Identity)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(cookieName)
-		if err != nil {
-			writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication is required.", nil)
-			return
-		}
-		identity, err := a.auth.Identity(r.Context(), cookie.Value)
-		if err != nil {
-			if errors.Is(err, auth.ErrUnauthenticated) {
-				writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication is required.", nil)
-			} else {
-				a.serverError(w, r, err)
-			}
-			return
-		}
-		if !hasRole(identity.Roles, "student") {
-			writeError(w, http.StatusForbidden, "FORBIDDEN", "This action requires a student account.", nil)
-			return
-		}
-		next(w, r, identity)
-	}
+	return a.requireRole(next, "This action requires a student account.", "student")
 }
 
 func (a *API) createStudentInvitation(w http.ResponseWriter, r *http.Request, id auth.Identity) {
@@ -397,10 +377,11 @@ func (a *API) saveStudentAnswer(w http.ResponseWriter, r *http.Request, id auth.
 		RequestID string          `json:"idempotency_key"`
 		Flagged   bool            `json:"flagged"`
 	}
-	if !decode(w, r, &req) || len(req.Answer) == 0 || !json.Valid(req.Answer) || req.Revision < 0 || len(req.RequestID) > 128 {
-		writeError(w, 400, "VALIDATION_ERROR", "Provide a valid JSON answer.", nil)
+	if !decode(w, r, &req) || len(req.Answer) == 0 || !json.Valid(req.Answer) || req.Revision < 0 || (req.RequestID != "" && !uuidPattern.MatchString(req.RequestID)) {
+		writeError(w, 400, "VALIDATION_ERROR", "Provide a valid JSON answer and a UUID idempotency key.", nil)
 		return
 	}
+	req.RequestID = strings.ToLower(req.RequestID)
 	studentID, err := a.learnerStudent(r, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, 403, "STUDENT_PROFILE_UNAVAILABLE", "No active student profile is linked to this account.", nil)
@@ -446,7 +427,7 @@ func (a *API) saveStudentAnswer(w http.ResponseWriter, r *http.Request, id auth.
 	}
 	var currentRevision int
 	var currentRequest string
-	err = tx.QueryRow(r.Context(), `SELECT revision,COALESCE(idempotency_key,'') FROM assessment_answers WHERE attempt_id=$1 AND question_id=$2`, r.PathValue("attemptID"), r.PathValue("questionID")).Scan(&currentRevision, &currentRequest)
+	err = tx.QueryRow(r.Context(), `SELECT revision,COALESCE(idempotency_key::text,'') FROM assessment_answers WHERE attempt_id=$1 AND question_id=$2`, r.PathValue("attemptID"), r.PathValue("questionID")).Scan(&currentRevision, &currentRequest)
 	if errors.Is(err, pgx.ErrNoRows) {
 		currentRevision = 0
 	} else if err != nil {
@@ -468,7 +449,7 @@ func (a *API) saveStudentAnswer(w http.ResponseWriter, r *http.Request, id auth.
 		writeError(w, 409, "STALE_REVISION", "A newer answer is already saved. Reload the assessment to reconcile it.", map[string]string{"current_revision": strconv.Itoa(currentRevision)})
 		return
 	}
-	_, err = tx.Exec(r.Context(), `INSERT INTO assessment_answers(attempt_id,school_id,question_id,answer,revision,idempotency_key,flagged,saved_at) VALUES($1,$2,$3,$4,$5,NULLIF($6,''),$7,now()) ON CONFLICT(attempt_id,question_id) DO UPDATE SET answer=EXCLUDED.answer,revision=EXCLUDED.revision,idempotency_key=EXCLUDED.idempotency_key,flagged=EXCLUDED.flagged,saved_at=now() WHERE assessment_answers.is_correct IS NULL AND EXCLUDED.revision>assessment_answers.revision`, r.PathValue("attemptID"), id.SchoolID, r.PathValue("questionID"), []byte(req.Answer), req.Revision, req.RequestID, req.Flagged)
+	_, err = tx.Exec(r.Context(), `INSERT INTO assessment_answers(attempt_id,school_id,question_id,answer,revision,idempotency_key,flagged,saved_at) VALUES($1,$2,$3,$4,$5,NULLIF($6,'')::uuid,$7,now()) ON CONFLICT(attempt_id,question_id) DO UPDATE SET answer=EXCLUDED.answer,revision=EXCLUDED.revision,idempotency_key=EXCLUDED.idempotency_key,flagged=EXCLUDED.flagged,saved_at=now() WHERE assessment_answers.is_correct IS NULL AND EXCLUDED.revision>assessment_answers.revision`, r.PathValue("attemptID"), id.SchoolID, r.PathValue("questionID"), []byte(req.Answer), req.Revision, req.RequestID, req.Flagged)
 	if err != nil {
 		a.serverError(w, r, err)
 		return
@@ -644,7 +625,7 @@ func (a *API) submitStudentAssessment(w http.ResponseWriter, r *http.Request, id
 		a.serverError(w, r, err)
 		return
 	}
-	if _, err = tx.Exec(r.Context(), `UPDATE assessment_attempts SET status='submitted',submitted_at=now(),score=$2,max_score=$3,results_released=($4=0),final_score=CASE WHEN $4=0 THEN $2 ELSE NULL END,final_max_score=CASE WHEN $4=0 THEN $5 ELSE NULL END WHERE id=$1`, attemptID, total, max, needsReview, finalMax); err != nil {
+	if _, err = tx.Exec(r.Context(), `UPDATE assessment_attempts SET status='submitted',submitted_at=now(),score=$2::numeric,max_score=$3::numeric,results_released=($4::int=0),final_score=CASE WHEN $4::int=0 THEN $2::numeric ELSE NULL END,final_max_score=CASE WHEN $4::int=0 THEN $5::numeric ELSE NULL END WHERE id=$1`, attemptID, total, max, needsReview, finalMax); err != nil {
 		a.serverError(w, r, err)
 		return
 	}

@@ -30,27 +30,7 @@ func (a *API) registerStaffRoutes(mux *http.ServeMux) {
 }
 
 func (a *API) teacher(next func(http.ResponseWriter, *http.Request, auth.Identity)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(cookieName)
-		if err != nil {
-			writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication is required.", nil)
-			return
-		}
-		identity, err := a.auth.Identity(r.Context(), cookie.Value)
-		if err != nil {
-			if errors.Is(err, auth.ErrUnauthenticated) {
-				writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication is required.", nil)
-			} else {
-				a.serverError(w, r, err)
-			}
-			return
-		}
-		if !hasRole(identity.Roles, "teacher") {
-			writeError(w, http.StatusForbidden, "FORBIDDEN", "This action requires a teacher account.", nil)
-			return
-		}
-		next(w, r, identity)
-	}
+	return a.requireRole(next, "This action requires a teacher account.", "teacher")
 }
 
 func (a *API) listStaff(w http.ResponseWriter, r *http.Request, id auth.Identity) {

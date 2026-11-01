@@ -1,4 +1,4 @@
-name: Build and smoke test
+name: Build, test, and smoke test
 
 on:
   push:
@@ -42,9 +42,25 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
-      - name: Build API
+      - name: Check Go modules
         working-directory: services/api
-        run: go mod tidy && go build ./...
+        run: go mod verify && go mod tidy -diff
+      - name: Check Go formatting
+        working-directory: services/api
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then echo "::error title=gofmt::Run gofmt -w on: $unformatted"; exit 1; fi
+      - name: Vet and build API
+        working-directory: services/api
+        run: go vet ./... && go build ./...
+      - name: Scan Go dependencies for vulnerabilities
+        working-directory: services/api
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+      - name: Run API tests
+        working-directory: services/api
+        env:
+          TEST_DATABASE_URL: postgres://furii:furii-ci-password@localhost:5432/furii?sslmode=disable
+        run: go test -count=1 ./...
       - name: Prepare Supabase roles for migrations
         env:
           POSTGRES_DB: furii
@@ -52,7 +68,7 @@ jobs:
         run: |
           postgres_container="$(docker ps -q --filter ancestor=postgres:17 | head -n 1)"
           test -n "$postgres_container"
-          docker exec "$postgres_container" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -c 'CREATE ROLE postgres NOLOGIN; CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;'
+          docker exec "$postgres_container" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -c "DO \$\$ DECLARE r text; BEGIN FOREACH r IN ARRAY ARRAY['postgres','anon','authenticated'] LOOP IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN EXECUTE format('CREATE ROLE %I NOLOGIN', r); END IF; END LOOP; END \$\$;"
       - name: Apply database migrations
         working-directory: services/api
         run: go run github.com/pressly/goose/v3/cmd/goose@v3.24.1 -dir migrations postgres "$DATABASE_URL" up
@@ -119,4 +135,4 @@ jobs:
           if ! echo "$question_bank" | jq -e --arg id "$question_id" 'any(.data[]; .id == $id and .status == "published" and (has("answer_key") | not) and .skill_tags[0].title == "Add fractions")'; then echo "::error title=FURII smoke test::Published question is missing or answer key was exposed: $question_bank"; exit 1; fi
       - name: Build web application
         working-directory: apps/web
-        run: npm ci && npm run build
+        run: npm ci && npm audit --omit=dev --audit-level=high && npm run build
