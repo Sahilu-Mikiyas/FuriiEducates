@@ -42,7 +42,19 @@ The landing page collects school name, learner-count band, region, timezone, lan
 
 ## Production web and API connection
 
-The Vercel deployment serves the Vite frontend; it does not run this Go API automatically. The root `render.yaml` prepares a small Render web service for `services/api`. Create it from this repository in Render and provide the Supabase `DATABASE_URL` and exact Vercel frontend origin when prompted. In Vercel, set `VITE_API_BASE_URL` to `https://furii-school-api.onrender.com` (the API origin only, with no `/api/v1`) in every environment you use, then redeploy. For local Vite development, leave `VITE_API_BASE_URL` empty to use the `/api` proxy; the local example is in `apps/web/.env.example`. Do not use the Supabase project URL or anon key as the API URL. The Blueprint generates `SESSION_HASH_KEY`, enables HTTPS cookies, and probes `/healthz`. Render's Free web services sleep after 15 minutes without requests and can take about a minute to wake; use a paid instance for production availability.
+The Vercel deployment serves the Vite frontend and proxies `/api/*` to the Go API on Render (see `apps/web/vercel.json`). Browsers therefore call the API on the frontend's own origin, so the session cookie is first-party; Safari and iOS block the third-party cookies the old direct setup needed. Leave `VITE_API_ORIGIN` unset in Vercel; the older `VITE_API_BASE_URL` variable is no longer read and can be deleted. Locally, the Vite dev server proxies `/api` to `localhost:8080` in the same way.
+
+The root `render.yaml` prepares a small Render web service for `services/api`. Create it from this repository in Render and provide the Supabase `DATABASE_URL` and the exact Vercel frontend origin. Keep that origin in `CORS_ALLOWED_ORIGINS` even behind the proxy, because the proxy forwards the browser's `Origin` header, which the API checks on every request to stop cross-site request forgery. The Blueprint generates `SESSION_HASH_KEY`, enables HTTPS cookies, sets `TRUST_PROXY_HEADERS` so rate limits see real client addresses, and probes `/healthz`.
+
+`COOKIE_SAMESITE` defaults to `none` with HTTPS cookies for compatibility. Once sign-in works through the Vercel proxy, set it to `lax` in Render and redeploy; users sign in again after the switch. Render's Free web services sleep after 15 minutes without requests and take about 30 to 60 seconds to wake. Vercel waits up to two minutes for a proxied response, so the first request still succeeds, but use a paid instance before a pilot.
+
+### Accounts and passwords
+
+Users change their own password from their workspace; this signs out their other devices. A school administrator can issue a one-time, 24-hour password reset link for a teacher (Staff access page) or a learner (Students page). A platform operator can issue one for a locked-out school administrator through `POST /api/v1/platform/password-resets`. Links are shown once and must be shared privately; there is no email delivery yet. Login is rate limited per client address and per account (10 failed attempts lock the account for 15 minutes). Expired sessions and old reset links are purged hourly.
+
+### Curriculum ownership
+
+Each curriculum belongs to the school that created it and is invisible to other schools. Curricula without an owning school form a read-only platform library that every school can use, for example to publish an official national curriculum once.
 
 The administrator workspace uses focused pages at `/admin/overview`, `/admin/students`, `/admin/classes`, `/admin/academic-passport`, `/admin/curriculum`, `/admin/assessments`, `/admin/finance`, `/admin/lesson-plans`, `/admin/staff`, and `/admin/settings`. Vercel rewrites those paths to the Vite app so they also load directly and survive a browser refresh.
 Before using real student data, complete the [Phase 1 pilot-readiness checklist](docs/phase-1-pilot-readiness.md).

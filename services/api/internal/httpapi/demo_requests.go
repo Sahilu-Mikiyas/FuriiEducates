@@ -8,7 +8,6 @@ import (
 	"errors"
 	"net/http"
 	"net/mail"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -38,7 +37,7 @@ type demoRequest struct {
 var demoRequestIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
 
 func (a *API) registerDemoRequestRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/v1/demo-requests", a.createDemoRequest)
+	mux.HandleFunc("POST /api/v1/demo-requests", a.limitByIP("demo-request", a.limits.demoRequestsPerIP, a.createDemoRequest))
 	mux.HandleFunc("GET /api/v1/platform/demo-requests", a.admin(a.demoRequestAdmin(a.listDemoRequests)))
 	mux.HandleFunc("PATCH /api/v1/platform/demo-requests/{requestID}", a.admin(a.demoRequestAdmin(a.updateDemoRequest)))
 	mux.HandleFunc("POST /api/v1/platform/demo-requests/{requestID}/prepare", a.admin(a.demoRequestAdmin(a.prepareSchoolFromRequest)))
@@ -46,19 +45,16 @@ func (a *API) registerDemoRequestRoutes(mux *http.ServeMux) {
 
 func (a *API) demoRequestAdmin(next func(http.ResponseWriter, *http.Request, auth.Identity)) func(http.ResponseWriter, *http.Request, auth.Identity) {
 	return func(w http.ResponseWriter, r *http.Request, identity auth.Identity) {
-		var email string
-		if err := a.db.QueryRow(r.Context(), "SELECT email FROM users WHERE id=$1", identity.UserID).Scan(&email); err != nil {
-			a.databaseError(w, r, err)
+		operator, err := a.isPlatformOperator(r.Context(), identity)
+		if err != nil {
+			a.serverError(w, r, err)
 			return
 		}
-		for _, candidate := range strings.Split(os.Getenv("DEMO_REQUEST_ADMIN_EMAILS"), ",") {
-			candidate = strings.TrimSpace(candidate)
-			if candidate != "" && strings.EqualFold(candidate, email) {
-				next(w, r, identity)
-				return
-			}
+		if !operator {
+			writeError(w, http.StatusForbidden, "FORBIDDEN", "This page is restricted to configured FURII product administrators.", nil)
+			return
 		}
-		writeError(w, http.StatusForbidden, "FORBIDDEN", "This inbox is restricted to configured FURII product administrators.", nil)
+		next(w, r, identity)
 	}
 }
 

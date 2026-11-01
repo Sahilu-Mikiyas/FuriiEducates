@@ -23,7 +23,7 @@ func (a *API) registerStaffRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/staff/invitations", a.admin(a.createStaffInvitation))
 	mux.HandleFunc("POST /api/v1/staff/invitations/{invitationID}/revoke", a.admin(a.revokeStaffInvitation))
 	mux.HandleFunc("PATCH /api/v1/staff/{staffID}", a.admin(a.updateStaffStatus))
-	mux.HandleFunc("POST /api/v1/staff/invitations/accept", a.acceptStaffInvitation)
+	mux.HandleFunc("POST /api/v1/staff/invitations/accept", a.limitByIP("token-redeem", a.limits.tokenRedemptionsPerIP, a.acceptStaffInvitation))
 	mux.HandleFunc("POST /api/v1/classes/{classID}/teachers", a.admin(a.assignTeacher))
 	mux.HandleFunc("GET /api/v1/teacher/classes", a.teacher(a.listTeacherClasses))
 	mux.HandleFunc("GET /api/v1/teacher/classes/{classID}/students", a.teacher(a.listTeacherClassStudents))

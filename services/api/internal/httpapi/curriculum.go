@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/furii/school-os/services/api/internal/auth"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -28,6 +30,72 @@ func (a *API) registerCurriculumRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/questions/{questionID}/publish", a.admin(a.publishQuestion))
 }
 
+// curriculumAccess describes what a school may do with a curriculum record.
+// A school owns the curricula it creates; curricula with no school are a
+// platform library that every school may read but none may change.
+type curriculumAccess int
+
+const (
+	curriculumHidden curriculumAccess = iota
+	curriculumReadOnly
+	curriculumWritable
+)
+
+func classifyCurriculumOwner(owner *string, schoolID string, err error) (curriculumAccess, error) {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return curriculumHidden, nil
+	}
+	if err != nil {
+		return curriculumHidden, err
+	}
+	if owner == nil {
+		return curriculumReadOnly, nil
+	}
+	if *owner == schoolID {
+		return curriculumWritable, nil
+	}
+	return curriculumHidden, nil
+}
+
+func (a *API) curriculumAccessByID(ctx context.Context, schoolID, curriculumID string) (curriculumAccess, error) {
+	var owner *string
+	err := a.db.QueryRow(ctx, `SELECT school_id::text FROM curricula WHERE id=$1`, curriculumID).Scan(&owner)
+	return classifyCurriculumOwner(owner, schoolID, err)
+}
+
+func (a *API) subjectAccessByID(ctx context.Context, schoolID, subjectID string) (curriculumAccess, error) {
+	var owner *string
+	err := a.db.QueryRow(ctx, `SELECT c.school_id::text FROM subjects s JOIN curricula c ON c.id=s.curriculum_id WHERE s.id=$1`, subjectID).Scan(&owner)
+	return classifyCurriculumOwner(owner, schoolID, err)
+}
+
+func (a *API) nodeAccessByID(ctx context.Context, schoolID, nodeID string) (curriculumAccess, error) {
+	if !uuidPattern.MatchString(nodeID) {
+		return curriculumHidden, nil
+	}
+	var owner *string
+	err := a.db.QueryRow(ctx, `SELECT c.school_id::text FROM curriculum_nodes n JOIN subjects s ON s.id=n.subject_id JOIN curricula c ON c.id=s.curriculum_id WHERE n.id=$1`, nodeID).Scan(&owner)
+	return classifyCurriculumOwner(owner, schoolID, err)
+}
+
+// allowCurriculum writes the error response and returns false when the
+// school cannot see the record, or cannot change it when needWrite is set.
+func (a *API) allowCurriculum(w http.ResponseWriter, r *http.Request, access curriculumAccess, err error, needWrite bool) bool {
+	if err != nil {
+		a.serverError(w, r, err)
+		return false
+	}
+	if access == curriculumHidden {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "The requested curriculum record was not found.", nil)
+		return false
+	}
+	if needWrite && access != curriculumWritable {
+		writeError(w, http.StatusForbidden, "CURRICULUM_READ_ONLY", "Platform curricula are read-only. Create your school's own curriculum version to change it.", nil)
+		return false
+	}
+	return true
+}
+
 func (a *API) reviewCurriculumMapping(w http.ResponseWriter, r *http.Request, id auth.Identity) {
 	var q struct {
 		SourceID   string   `json:"source_node_id"`
@@ -44,18 +112,14 @@ func (a *API) reviewCurriculumMapping(w http.ResponseWriter, r *http.Request, id
 		writeError(w, 400, "VALIDATION_ERROR", "Choose distinct curriculum nodes, a valid mapping type, and confidence between 0 and 1.", nil)
 		return
 	}
-	var sourceExists, targetExists bool
-	err := a.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM curriculum_nodes WHERE id=$1),EXISTS(SELECT 1 FROM curriculum_nodes WHERE id=$2)`, q.SourceID, q.TargetID).Scan(&sourceExists, &targetExists)
-	if err != nil {
-		a.serverError(w, r, err)
-		return
-	}
-	if !sourceExists || !targetExists {
-		writeError(w, 404, "NOT_FOUND", "Curriculum node not found.", nil)
-		return
+	for _, nodeID := range []string{q.SourceID, q.TargetID} {
+		access, err := a.nodeAccessByID(r.Context(), id.SchoolID, nodeID)
+		if !a.allowCurriculum(w, r, access, err, false) {
+			return
+		}
 	}
 	var mappingID string
-	err = a.db.QueryRow(r.Context(), `INSERT INTO curriculum_mappings(source_node_id,target_node_id,mapping_type,confidence,reviewed_by) VALUES($1,$2,$3,$4,$5) ON CONFLICT(source_node_id,target_node_id,mapping_type) DO UPDATE SET confidence=EXCLUDED.confidence,reviewed_by=EXCLUDED.reviewed_by RETURNING id::text`, q.SourceID, q.TargetID, q.Type, q.Confidence, id.UserID).Scan(&mappingID)
+	err := a.db.QueryRow(r.Context(), `INSERT INTO curriculum_mappings(school_id,source_node_id,target_node_id,mapping_type,confidence,reviewed_by) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(school_id,source_node_id,target_node_id,mapping_type) DO UPDATE SET confidence=EXCLUDED.confidence,reviewed_by=EXCLUDED.reviewed_by RETURNING id::text`, id.SchoolID, q.SourceID, q.TargetID, q.Type, q.Confidence, id.UserID).Scan(&mappingID)
 	if err != nil {
 		a.databaseError(w, r, err)
 		return
@@ -67,8 +131,8 @@ func (a *API) reviewCurriculumMapping(w http.ResponseWriter, r *http.Request, id
 	writeJSON(w, 200, map[string]any{"data": map[string]string{"id": mappingID, "status": "reviewed"}})
 }
 
-func (a *API) listCurriculumMappings(w http.ResponseWriter, r *http.Request, _ auth.Identity) {
-	rows, err := a.db.Query(r.Context(), `SELECT m.id::text,m.source_node_id::text,s.title,m.target_node_id::text,t.title,m.mapping_type,m.confidence,m.reviewed_by::text FROM curriculum_mappings m JOIN curriculum_nodes s ON s.id=m.source_node_id JOIN curriculum_nodes t ON t.id=m.target_node_id ORDER BY m.created_at DESC LIMIT 500`)
+func (a *API) listCurriculumMappings(w http.ResponseWriter, r *http.Request, who auth.Identity) {
+	rows, err := a.db.Query(r.Context(), `SELECT m.id::text,m.source_node_id::text,s.title,m.target_node_id::text,t.title,m.mapping_type,m.confidence,m.reviewed_by::text FROM curriculum_mappings m JOIN curriculum_nodes s ON s.id=m.source_node_id JOIN curriculum_nodes t ON t.id=m.target_node_id WHERE m.school_id=$1 ORDER BY m.created_at DESC LIMIT 500`, who.SchoolID)
 	if err != nil {
 		a.serverError(w, r, err)
 		return
@@ -92,8 +156,8 @@ func (a *API) listCurriculumMappings(w http.ResponseWriter, r *http.Request, _ a
 	writeJSON(w, 200, map[string]any{"data": items})
 }
 
-func (a *API) listCurricula(w http.ResponseWriter, r *http.Request, _ auth.Identity) {
-	rows, err := a.db.Query(r.Context(), `SELECT id::text,name,provider,COALESCE(country_code,''),version_label,language_code,COALESCE(source_reference,''),COALESCE(license_notes,'') FROM curricula ORDER BY provider,name,version_label`)
+func (a *API) listCurricula(w http.ResponseWriter, r *http.Request, who auth.Identity) {
+	rows, err := a.db.Query(r.Context(), `SELECT id::text,name,provider,COALESCE(country_code,''),version_label,language_code,COALESCE(source_reference,''),COALESCE(license_notes,''),school_id IS NULL FROM curricula WHERE school_id=$1 OR school_id IS NULL ORDER BY school_id IS NULL,provider,name,version_label`, who.SchoolID)
 	if err != nil {
 		a.serverError(w, r, err)
 		return
@@ -102,11 +166,16 @@ func (a *API) listCurricula(w http.ResponseWriter, r *http.Request, _ auth.Ident
 	items := []map[string]any{}
 	for rows.Next() {
 		var id, name, provider, country, version, language, source, license string
-		if err = rows.Scan(&id, &name, &provider, &country, &version, &language, &source, &license); err != nil {
+		var platform bool
+		if err = rows.Scan(&id, &name, &provider, &country, &version, &language, &source, &license, &platform); err != nil {
 			a.serverError(w, r, err)
 			return
 		}
-		items = append(items, map[string]any{"id": id, "name": name, "provider": provider, "country_code": country, "version_label": version, "language_code": language, "source_reference": source, "license_notes": license})
+		owner := "school"
+		if platform {
+			owner = "platform"
+		}
+		items = append(items, map[string]any{"id": id, "name": name, "provider": provider, "country_code": country, "version_label": version, "language_code": language, "source_reference": source, "license_notes": license, "owner": owner, "read_only": platform})
 	}
 	if err = rows.Err(); err != nil {
 		a.serverError(w, r, err)
@@ -141,7 +210,7 @@ func (a *API) createCurriculum(w http.ResponseWriter, r *http.Request, id auth.I
 		q.Language = "en"
 	}
 	var cid string
-	err := a.db.QueryRow(r.Context(), `INSERT INTO curricula(name,provider,country_code,version_label,language_code,source_reference,license_notes) VALUES($1,$2,NULLIF($3,''),$4,$5,NULLIF($6,''),NULLIF($7,'')) RETURNING id::text`, q.Name, q.Provider, strings.TrimSpace(q.CountryCode), q.Version, q.Language, strings.TrimSpace(q.Source), strings.TrimSpace(q.License)).Scan(&cid)
+	err := a.db.QueryRow(r.Context(), `INSERT INTO curricula(school_id,name,provider,country_code,version_label,language_code,source_reference,license_notes) VALUES($1,$2,$3,NULLIF($4,''),$5,$6,NULLIF($7,''),NULLIF($8,'')) RETURNING id::text`, id.SchoolID, q.Name, q.Provider, strings.TrimSpace(q.CountryCode), q.Version, q.Language, strings.TrimSpace(q.Source), strings.TrimSpace(q.License)).Scan(&cid)
 	if err != nil {
 		a.databaseError(w, r, err)
 		return
@@ -153,7 +222,11 @@ func (a *API) createCurriculum(w http.ResponseWriter, r *http.Request, id auth.I
 	writeJSON(w, 201, map[string]any{"data": map[string]string{"id": cid}})
 }
 
-func (a *API) listSubjects(w http.ResponseWriter, r *http.Request, _ auth.Identity) {
+func (a *API) listSubjects(w http.ResponseWriter, r *http.Request, who auth.Identity) {
+	access, err := a.curriculumAccessByID(r.Context(), who.SchoolID, r.PathValue("curriculumID"))
+	if !a.allowCurriculum(w, r, access, err, false) {
+		return
+	}
 	rows, err := a.db.Query(r.Context(), `SELECT id::text,name,COALESCE(grade_level,''),COALESCE(subject_code,'') FROM subjects WHERE curriculum_id=$1 ORDER BY grade_level,name`, r.PathValue("curriculumID"))
 	if err != nil {
 		a.databaseError(w, r, err)
@@ -191,8 +264,12 @@ func (a *API) createSubject(w http.ResponseWriter, r *http.Request, id auth.Iden
 		writeError(w, 400, "VALIDATION_ERROR", "Subject name is required.", nil)
 		return
 	}
+	access, err := a.curriculumAccessByID(r.Context(), id.SchoolID, r.PathValue("curriculumID"))
+	if !a.allowCurriculum(w, r, access, err, true) {
+		return
+	}
 	var sid string
-	err := a.db.QueryRow(r.Context(), `INSERT INTO subjects(curriculum_id,name,grade_level,subject_code) VALUES($1,$2,NULLIF($3,''),NULLIF($4,'')) RETURNING id::text`, r.PathValue("curriculumID"), q.Name, strings.TrimSpace(q.Grade), strings.TrimSpace(q.Code)).Scan(&sid)
+	err = a.db.QueryRow(r.Context(), `INSERT INTO subjects(curriculum_id,name,grade_level,subject_code) VALUES($1,$2,NULLIF($3,''),NULLIF($4,'')) RETURNING id::text`, r.PathValue("curriculumID"), q.Name, strings.TrimSpace(q.Grade), strings.TrimSpace(q.Code)).Scan(&sid)
 	if err != nil {
 		a.databaseError(w, r, err)
 		return
@@ -204,7 +281,11 @@ func (a *API) createSubject(w http.ResponseWriter, r *http.Request, id auth.Iden
 	writeJSON(w, 201, map[string]any{"data": map[string]string{"id": sid}})
 }
 
-func (a *API) listCurriculumNodes(w http.ResponseWriter, r *http.Request, _ auth.Identity) {
+func (a *API) listCurriculumNodes(w http.ResponseWriter, r *http.Request, who auth.Identity) {
+	access, err := a.subjectAccessByID(r.Context(), who.SchoolID, r.PathValue("subjectID"))
+	if !a.allowCurriculum(w, r, access, err, false) {
+		return
+	}
 	rows, err := a.db.Query(r.Context(), `SELECT id::text,COALESCE(parent_id::text,''),node_type,COALESCE(code,''),title,COALESCE(description,''),sort_order FROM curriculum_nodes WHERE subject_id=$1 ORDER BY sort_order,title`, r.PathValue("subjectID"))
 	if err != nil {
 		a.databaseError(w, r, err)
@@ -247,9 +328,17 @@ func (a *API) createCurriculumNode(w http.ResponseWriter, r *http.Request, id au
 		writeError(w, 400, "VALIDATION_ERROR", "Title and a valid node type are required.", nil)
 		return
 	}
+	access, err := a.subjectAccessByID(r.Context(), id.SchoolID, r.PathValue("subjectID"))
+	if !a.allowCurriculum(w, r, access, err, true) {
+		return
+	}
 	if q.ParentID != "" {
+		if !uuidPattern.MatchString(q.ParentID) {
+			writeError(w, 400, "VALIDATION_ERROR", "Parent node must belong to the same subject.", nil)
+			return
+		}
 		var same bool
-		err := a.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM curriculum_nodes p JOIN subjects s ON s.id=p.subject_id WHERE p.id=$1 AND p.subject_id=$2)`, q.ParentID, r.PathValue("subjectID")).Scan(&same)
+		err := a.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM curriculum_nodes p WHERE p.id=$1 AND p.subject_id=$2)`, q.ParentID, r.PathValue("subjectID")).Scan(&same)
 		if err != nil {
 			a.serverError(w, r, err)
 			return
@@ -260,7 +349,7 @@ func (a *API) createCurriculumNode(w http.ResponseWriter, r *http.Request, id au
 		}
 	}
 	var nid string
-	err := a.db.QueryRow(r.Context(), `INSERT INTO curriculum_nodes(subject_id,parent_id,node_type,code,title,description,sort_order) VALUES($1,NULLIF($2,'')::uuid,$3,NULLIF($4,''),$5,NULLIF($6,''),$7) RETURNING id::text`, r.PathValue("subjectID"), q.ParentID, q.Type, strings.TrimSpace(q.Code), q.Title, strings.TrimSpace(q.Description), q.Order).Scan(&nid)
+	err = a.db.QueryRow(r.Context(), `INSERT INTO curriculum_nodes(subject_id,parent_id,node_type,code,title,description,sort_order) VALUES($1,NULLIF($2,'')::uuid,$3,NULLIF($4,''),$5,NULLIF($6,''),$7) RETURNING id::text`, r.PathValue("subjectID"), q.ParentID, q.Type, strings.TrimSpace(q.Code), q.Title, strings.TrimSpace(q.Description), q.Order).Scan(&nid)
 	if err != nil {
 		a.databaseError(w, r, err)
 		return
@@ -456,8 +545,11 @@ func (a *API) saveQuestion(r *http.Request, id auth.Identity, q questionPayload,
 				return "", errInvalidQuestionTags
 			}
 			sum += tag.Weight
+			if !uuidPattern.MatchString(tag.SkillID) {
+				return "", errInvalidQuestionTags
+			}
 			var valid bool
-			if err := a.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM curriculum_nodes WHERE id=$1 AND node_type='skill')`, tag.SkillID).Scan(&valid); err != nil {
+			if err := a.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM curriculum_nodes n JOIN subjects s ON s.id=n.subject_id JOIN curricula c ON c.id=s.curriculum_id WHERE n.id=$1 AND n.node_type='skill' AND (c.school_id=$2 OR c.school_id IS NULL))`, tag.SkillID, id.SchoolID).Scan(&valid); err != nil {
 				return "", err
 			}
 			if !valid {

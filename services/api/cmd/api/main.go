@@ -42,6 +42,7 @@ func main() {
 	}
 
 	service := auth.NewService(db, cfg.SessionHashKey, cfg.SessionTTL)
+	httpapi.StartMaintenance(ctx, db, logger, time.Hour)
 	handler := httpapi.New(service, db, cfg.CookieSecure, cfg.SessionTTL, logger)
 	server := &http.Server{Addr: cfg.HTTPAddr, Handler: handler, ReadHeaderTimeout: 5 * time.Second}
 	go func() {

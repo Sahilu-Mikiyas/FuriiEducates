@@ -1,17 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '')
-const apiURL = (path: string) => `${API_BASE_URL}/api/v1${path}`
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers = new Headers(init?.headers)
-  if (!(init?.body instanceof FormData)) headers.set('Content-Type', 'application/json')
-  const response = await fetch(apiURL(path), { ...init, credentials: 'include', headers })
-  const type = response.headers.get('content-type') || ''
-  if (!type.includes('json')) throw new Error(`The school API returned HTTP ${response.status}.`)
-  const body = await response.json()
-  if (!response.ok) throw new Error(body?.error?.message || 'The request could not be completed.')
-  return body.data as T
-}
+import { api, apiURL } from './api'
 
 type Student = { id: string; legal_name: string; student_number: string }
 type Staff = { id: string; display_name: string }

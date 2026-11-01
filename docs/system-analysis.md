@@ -21,6 +21,18 @@ This document is the working roadmap. Update it as items are fixed.
 
 Next: Phase 1 (security and tenancy).
 
+**2026-11-01 — Phase 1 (security and tenancy) completed.**
+
+- P0-1 fixed: curricula and curriculum mappings now belong to a school (migration 00014). Other schools cannot read, extend, map, or tag questions with them. Curricula without a school are a read-only platform library. Existing data is backfilled from the audit log, or to the only school on single-school installations; tests cover both cases.
+- P0-2 fixed: the frontend calls the API through a Vercel `/api` proxy, so the session cookie is first-party and Safari and iOS sign-in work. `COOKIE_SAMESITE` makes the cookie mode configurable (switch Render to `lax` after deploying). The CSRF check is explicit: unknown origins and cross-site fetch metadata are rejected on unsafe requests. The three duplicated frontend API clients were merged into one.
+- P0-3 fixed: self-service password change (signs out other devices), admin-issued 24-hour reset links for teachers and learners, and operator-issued links for locked-out school administrators. Verified end to end in a browser.
+- P0-6 fixed: per-address limits on login, link redemption, and the public setup form, plus a per-account failed-login lock. Per-address limits stay generous because a computer lab shares one public address.
+- Expired sessions and old reset links are purged hourly.
+- The school setup requests page is hidden from administrators who are not platform operators, and invitation pages now lead to the sign-in page.
+- Browser testing found that the dev proxy needs `CORS_ALLOWED_ORIGINS=http://localhost:5173`; the example environment file now says so.
+
+Next: Phase 2 (exam correctness), merged with secure exams v1 per docs/product-plan.md.
+
 ---
 
 ## 1. What the system is today

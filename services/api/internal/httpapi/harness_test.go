@@ -97,7 +97,19 @@ func requireDB(t *testing.T) {
 	}
 }
 
+// testRateLimits keeps limits out of the way of ordinary tests, which sign in
+// many times from one address.
+func testRateLimits() rateLimits {
+	generous := limitRule{limit: 100000, window: time.Minute}
+	return rateLimits{loginPerIP: generous, loginFailuresPerAccount: generous, tokenRedemptionsPerIP: generous, demoRequestsPerIP: generous, passwordFailuresPerUser: generous}
+}
+
 func newTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	return newTestServerWithLimits(t, testRateLimits())
+}
+
+func newTestServerWithLimits(t *testing.T, limits rateLimits) *httptest.Server {
 	t.Helper()
 	requireDB(t)
 	var logOutput io.Writer = io.Discard
@@ -106,7 +118,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	}
 	logger := slog.New(slog.NewTextHandler(logOutput, nil))
 	service := auth.NewService(testDB, []byte("test-only-session-hash-key-32-bytes!!"), time.Hour)
-	server := httptest.NewServer(New(service, testDB, false, time.Hour, logger))
+	server := httptest.NewServer(newAPI(service, testDB, false, time.Hour, logger, limits).routes())
 	t.Cleanup(server.Close)
 	return server
 }
@@ -142,6 +154,11 @@ type apiResponse struct {
 
 func (c *apiClient) call(method, path string, body any) apiResponse {
 	c.t.Helper()
+	return c.callWithHeaders(method, path, body, nil)
+}
+
+func (c *apiClient) callWithHeaders(method, path string, body any, headers map[string]string) apiResponse {
+	c.t.Helper()
 	var reader io.Reader
 	if body != nil {
 		raw, err := json.Marshal(body)
@@ -156,6 +173,9 @@ func (c *apiClient) call(method, path string, body any) apiResponse {
 	}
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")
+	}
+	for key, value := range headers {
+		request.Header.Set(key, value)
 	}
 	response, err := c.client.Do(request)
 	if err != nil {
@@ -247,6 +267,13 @@ func containsID(items []map[string]any, id string) bool {
 // database, as cmd/bootstrap does, and returns a signed-in admin client.
 func seedSchool(t *testing.T, server *httptest.Server) (string, *apiClient) {
 	t.Helper()
+	schoolID, _, admin := seedSchoolAccount(t, server)
+	return schoolID, admin
+}
+
+// seedSchoolAccount is seedSchool that also returns the administrator's email.
+func seedSchoolAccount(t *testing.T, server *httptest.Server) (string, string, *apiClient) {
+	t.Helper()
 	ctx := context.Background()
 	hash, err := auth.HashPassword(testPassword)
 	if err != nil {
@@ -265,7 +292,7 @@ func seedSchool(t *testing.T, server *httptest.Server) (string, *apiClient) {
 	}
 	admin := newClient(t, server)
 	admin.login(email)
-	return schoolID, admin
+	return schoolID, email, admin
 }
 
 // createClass creates an academic year and a class in it.

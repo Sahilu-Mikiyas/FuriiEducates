@@ -14,10 +14,11 @@ This checklist prepares the first FURII School OS pilot after the initial Render
 
 ### Production domain and browser access
 
-- [ ] Keep `VITE_API_BASE_URL` in Vercel set to `https://furii-school-api.onrender.com` for the production and preview environments that need the API.
+- [ ] Confirm the frontend reaches the API through the Vercel `/api` proxy (`apps/web/vercel.json`): sign in on Safari or an iPhone, and leave `VITE_API_ORIGIN` unset. The old `VITE_API_BASE_URL` variable is no longer used and can be deleted.
+- [ ] After sign-in works through the proxy, set `COOKIE_SAMESITE=lax` in Render and redeploy.
 - [ ] Keep `CORS_ALLOWED_ORIGINS` in Render restricted to the stable production origin `https://furii-educates.vercel.app`.
 - [ ] Remove temporary Vercel preview origins from Render after preview testing. Add a preview origin only when actively testing that exact deployment.
-- [ ] Redeploy the Render API after changing CORS, then redeploy the Vercel frontend after changing its build-time API URL.
+- [ ] Redeploy the Render API after changing CORS or cookie settings.
 - [ ] Confirm `https://furii-school-api.onrender.com/healthz` returns `{"data":{"status":"ok"}}` after each infrastructure change.
 
 ### Secrets and administrator access

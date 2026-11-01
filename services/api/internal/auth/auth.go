@@ -145,3 +145,19 @@ func verifyPassword(encoded, password string) bool {
 	actual := argon2.IDKey([]byte(password), salt, iterations, memory, parallelism, uint32(len(expected)))
 	return hmac.Equal(actual, expected)
 }
+
+// CheckPassword reports whether password matches the user's stored hash.
+func (s *Service) CheckPassword(ctx context.Context, userID, password string) (bool, error) {
+	var encoded string
+	err := s.db.QueryRow(ctx, `SELECT password_hash FROM users WHERE id=$1`, userID).Scan(&encoded)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return verifyPassword(encoded, password), nil
+}
+
+// TokenDigest returns the stored form of a raw session token.
+func (s *Service) TokenDigest(token string) []byte { return s.digest(token) }

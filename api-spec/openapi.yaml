@@ -22,6 +22,7 @@ paths:
         '200': { description: Authenticated; sets an HttpOnly session cookie }
         '400': { description: Invalid request }
         '401': { description: Invalid credentials }
+        '429': { description: Too many attempts from this address, or too many failed attempts for this account (RATE_LIMITED); see Retry-After }
   /auth/logout:
     post:
       summary: Revoke the current session
@@ -30,6 +31,7 @@ paths:
   /me:
     get:
       summary: Get the current identity and roles
+      description: Includes platform_operator, which is true for school administrators listed in DEMO_REQUEST_ADMIN_EMAILS.
       security: [{ sessionCookie: [] }]
       responses:
         '200': { description: Current user }
@@ -896,6 +898,83 @@ paths:
       security: [{ sessionCookie: [] }]
       responses:
         '200': { description: Totals for tuition, payments, expenses, salaries, and outstanding charges }
+  /auth/password:
+    post:
+      summary: Change the signed-in user's password
+      description: Signs out the account's other sessions and cancels unused reset links. The current session stays signed in. Repeated wrong current passwords are rate limited.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string }
+                new_password: { type: string, minLength: 12, maxLength: 1024 }
+      responses:
+        '200': { description: Password changed }
+        '400': { description: Current password incorrect (INVALID_CURRENT_PASSWORD) or new password too short }
+        '429': { description: Too many failed attempts (RATE_LIMITED) }
+  /auth/password-reset/complete:
+    post:
+      summary: Redeem a one-time password reset link
+      description: Public and rate limited per client address. Sets the password, marks the link used, and signs the account out everywhere.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token: { type: string, minLength: 32, maxLength: 128 }
+                new_password: { type: string, minLength: 12, maxLength: 1024 }
+      responses:
+        '200': { description: Password changed; returns the account email }
+        '400': { description: Link invalid, expired, used, or replaced (RESET_INVALID), or password too short }
+        '429': { description: Too many attempts from this address (RATE_LIMITED) }
+  /staff/{staffID}/password-reset:
+    parameters:
+      - { name: staffID, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Issue a password reset link for a teacher or another administrator
+      description: Returns a 24-hour, single-use token once and cancels earlier unused links for that account. Administrators use Change password for their own account.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Link issued, including the one-time token }
+        '400': { description: Target is the signed-in administrator (USE_CHANGE_PASSWORD) }
+        '404': { description: Staff account not found in this school }
+        '409': { description: Account is disabled }
+  /students/{studentID}/password-reset:
+    parameters:
+      - { name: studentID, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Issue a password reset link for a student's learner account
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Link issued, including the one-time token }
+        '404': { description: Student not found in this school }
+        '409': { description: Student has no learner account yet, or it is disabled }
+  /platform/password-resets:
+    post:
+      summary: Issue a password reset link for a locked-out school administrator
+      description: Platform operators only (email listed in DEMO_REQUEST_ADMIN_EMAILS).
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '201': { description: Link issued, including the one-time token }
+        '403': { description: Not a platform operator }
+        '404': { description: No school administrator uses that email }
 components:
   securitySchemes:
     sessionCookie:

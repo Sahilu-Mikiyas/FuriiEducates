@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import './marketing.css'
+import { apiURL } from './api'
 
 const views = [
   {
@@ -120,10 +121,8 @@ export function MarketingLanding() {
       return
     }
     setWalkthroughBusy(true); setWalkthroughError('')
-    const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '')
     try {
-      if (!apiBase) throw new Error('School setup is not connected right now. Please try again later.')
-      const response = await fetch(apiBase + '/api/v1/demo-requests', {
+      const response = await fetch(apiURL('/demo-requests'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'omit',
         body: JSON.stringify(setup),
       })
