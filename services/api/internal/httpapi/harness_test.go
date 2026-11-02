@@ -50,9 +50,11 @@ func runTests(m *testing.M) int {
 	defer admin.Close(ctx)
 
 	// Migration 00010 revokes privileges from Supabase's roles, so they must
-	// exist on a plain PostgreSQL server too.
+	// exist on a plain PostgreSQL server too. Roles belong to the whole server
+	// and go test runs packages at once, so another package may create one
+	// between the check and the CREATE.
 	for _, role := range []string{"postgres", "anon", "authenticated"} {
-		statement := fmt.Sprintf(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '%s') THEN CREATE ROLE %s NOLOGIN; END IF; END $$`, role, pgx.Identifier{role}.Sanitize())
+		statement := fmt.Sprintf(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '%s') THEN CREATE ROLE %s NOLOGIN; END IF; EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL; END $$`, role, pgx.Identifier{role}.Sanitize())
 		if _, err := admin.Exec(ctx, statement); err != nil {
 			fmt.Fprintln(os.Stderr, "prepare role", role, ":", err)
 			return 1

@@ -51,8 +51,10 @@ func freshDatabase(t *testing.T) *pgxpool.Pool {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { admin.Close(context.Background()) })
+	// Roles belong to the whole server and go test runs packages at once, so
+	// another package may create one between the check and the CREATE.
 	for _, role := range []string{"postgres", "anon", "authenticated"} {
-		if _, err := admin.Exec(ctx, fmt.Sprintf(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '%s') THEN CREATE ROLE %s NOLOGIN; END IF; END $$`, role, pgx.Identifier{role}.Sanitize())); err != nil {
+		if _, err := admin.Exec(ctx, fmt.Sprintf(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '%s') THEN CREATE ROLE %s NOLOGIN; END IF; EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL; END $$`, role, pgx.Identifier{role}.Sanitize())); err != nil {
 			t.Fatal(err)
 		}
 	}
