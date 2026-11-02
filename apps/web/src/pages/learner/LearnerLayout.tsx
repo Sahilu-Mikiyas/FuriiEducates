@@ -1,7 +1,9 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useFeedback, Toast } from '../../app/feedback'
-import { useLogout } from '../../app/session'
+import { useOnline } from '../../app/pwa'
+import { SESSION_KEY, useLogout } from '../../app/session'
 import { Brand, LanguageSwitch } from '../../app/shared'
 import { useI18n } from '../../i18n'
 import { useLearnerAssignments } from '../../lib/queries'
@@ -12,9 +14,14 @@ export default function LearnerLayout({ identity }: { identity: Identity }) {
   const { clear } = useFeedback()
   const logout = useLogout()
   const { pathname } = useLocation()
-  const assignments = useLearnerAssignments().data ?? []
+  const client = useQueryClient()
+  const online = useOnline()
+  const assignmentsQuery = useLearnerAssignments()
+  const assignments = assignmentsQuery.data ?? []
 
   useEffect(() => { clear() }, [pathname, clear])
+  // A student stays signed in offline from their last visit. Check with the server again once connected.
+  useEffect(() => { if (online) void client.invalidateQueries({ queryKey: SESSION_KEY }) }, [online, client])
 
   return <div className="learner-shell">
     <aside className="learner-sidebar">
@@ -31,7 +38,7 @@ export default function LearnerLayout({ identity }: { identity: Identity }) {
           <small>{a.grade_level} · {a.class_name}</small>
           <span>{label('status', a.attempt_status)}</span>
         </Link>)}
-        {!assignments.length && <p className="empty">{t('learner.noAssignments')}</p>}
+        {assignmentsQuery.isSuccess && !assignments.length && <p className="empty">{t('learner.noAssignments')}</p>}
       </div>
       <div className="workspace-foot">
         <LanguageSwitch />
@@ -41,6 +48,7 @@ export default function LearnerLayout({ identity }: { identity: Identity }) {
     <main className="learner-main">
       <header className="teacher-topbar"><span>{t('learner.workspace')}</span><strong>{identity.display_name}</strong></header>
       <div className="learner-content">
+        {!online && <p className="offline-banner" role="status">{t('offline.banner')} <Link to="/learn/prep">{t('offline.bannerLink')}</Link></p>}
         <Toast />
         <Outlet />
       </div>

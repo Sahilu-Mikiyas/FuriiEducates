@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { FormEvent, useState } from 'react'
 import { Navigate } from 'react-router'
-import { homePath, SESSION_KEY, useSession } from '../../app/session'
+import { homePath, rememberIdentity, SESSION_KEY, useSession } from '../../app/session'
 import { Brand, LanguageSwitch, Loading } from '../../app/shared'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
@@ -24,6 +24,7 @@ export default function LoginPage() {
         await api('/auth/logout', { method: 'POST' })
         throw new Error(t('login.roleNotEnabled'))
       }
+      rememberIdentity(user)
       client.setQueryData(SESSION_KEY, user)
     } catch (e) { setError(errorText(e, 'error.generic')) } finally { setBusy(false) }
   }

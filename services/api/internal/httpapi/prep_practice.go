@@ -253,7 +253,8 @@ func (a *API) closeOpenPractice(ctx context.Context, schoolID, studentID string)
 func finishPrepSessionTx(ctx context.Context, tx pgx.Tx, schoolID, sessionID string) error {
 	var status, mode, studentID string
 	var mockID *string
-	err := tx.QueryRow(ctx, `SELECT status,mode,student_id::text,mock_id::text FROM prep_sessions WHERE id=$1 AND school_id=$2 FOR UPDATE`, sessionID, schoolID).Scan(&status, &mode, &studentID, &mockID)
+	var offline bool
+	err := tx.QueryRow(ctx, `SELECT status,mode,student_id::text,mock_id::text,offline FROM prep_sessions WHERE id=$1 AND school_id=$2 FOR UPDATE`, sessionID, schoolID).Scan(&status, &mode, &studentID, &mockID, &offline)
 	if err != nil {
 		return err
 	}
@@ -262,7 +263,9 @@ func finishPrepSessionTx(ctx context.Context, tx pgx.Tx, schoolID, sessionID str
 	}
 	weight := prepPracticeWeight
 	if mode == "timed" {
-		weight = prepTimedWeight
+		if !offline {
+			weight = prepTimedWeight
+		}
 		if _, err = tx.Exec(ctx, `UPDATE prep_session_items i SET is_correct=(i.answer IS NOT NULL AND q.answer_key->>0=i.answer),answered_at=COALESCE(i.answered_at,now())
 			FROM questions q WHERE q.id=i.question_id AND i.session_id=$1`, sessionID); err != nil {
 			return err

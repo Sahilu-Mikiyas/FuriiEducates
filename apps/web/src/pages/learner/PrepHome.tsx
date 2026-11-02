@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router'
 import { useAction } from '../../app/feedback'
+import { useSession } from '../../app/session'
+import { OfflinePanel } from '../../features/prep/OfflinePanel'
 import { PaperBars, TotalBadge, usePaperName } from '../../features/prep/readiness'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
@@ -13,7 +15,8 @@ export default function PrepHome() {
   const navigate = useNavigate()
   const paperName = usePaperName()
   const { busy, run } = useAction()
-  const query = useQuery({ queryKey: [PREP_HUB_PATH], queryFn: () => api<PrepHub>(PREP_HUB_PATH) })
+  const { identity } = useSession()
+  const query = useQuery({ queryKey: [PREP_HUB_PATH], queryFn: () => api<PrepHub>(PREP_HUB_PATH), networkMode: 'always', retry: 1, meta: { silent: true } })
   const hub = query.data
 
   const startPractice = (mode: PrepMode, paper: string, skillID?: string) => run(async () => {
@@ -29,7 +32,18 @@ export default function PrepHome() {
     navigate(`/learn/prep/session/${session.id}`)
   })
 
-  if (!hub) return <p className="empty" role="status">{t('common.loading')}</p>
+  if (!hub && query.isPending) return <p className="empty" role="status">{t('common.loading')}</p>
+  // With no connection, downloaded practice still works.
+  if (!hub) {
+    return <>
+      <div className="learner-welcome">
+        <p className="eyebrow">{t('prep.eyebrow')}</p>
+        <h1>{t('offline.unreachableTitle')}</h1>
+        <p className="muted">{t('offline.unreachableHelp')}</p>
+      </div>
+      {identity && <OfflinePanel userID={identity.user_id} papers={[]} hubPath={PREP_HUB_PATH} />}
+    </>
+  }
 
   const readiness = hub.readiness
   const openMock = hub.mocks.find((mock) => mock.status === 'in_progress')
@@ -98,6 +112,8 @@ export default function PrepHome() {
         </article>)}
       </div>
     </section>
+
+    {identity && <OfflinePanel userID={identity.user_id} papers={hub.papers} hubPath={PREP_HUB_PATH} />}
 
     <section className="panel">
       <div className="panel-head">

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import { App } from './app/App'
 import { FeedbackProvider, loadFailed } from './app/feedback'
+import { registerServiceWorker } from './app/pwa'
 import { SESSION_KEY } from './app/session'
 import { ErrorBoundary } from './app/shared'
 import { PreferencesProvider } from './i18n'
@@ -12,13 +13,13 @@ import './style.css'
 const queryClient: QueryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error, query) => {
-      if (query.meta?.silent) return
       // The session ended while the page was open: return to sign in.
-      if (error instanceof APIError && error.status === 401) {
+      if (error instanceof APIError && error.status === 401 && query.queryKey[0] !== SESSION_KEY[0]) {
         queryClient.clear()
         queryClient.setQueryData(SESSION_KEY, null)
         return
       }
+      if (query.meta?.silent || !navigator.onLine) return
       loadFailed(error)
     },
   }),
@@ -31,6 +32,8 @@ const queryClient: QueryClient = new QueryClient({
     },
   },
 })
+
+registerServiceWorker()
 
 createRoot(document.getElementById('root')!).render(
   <PreferencesProvider>

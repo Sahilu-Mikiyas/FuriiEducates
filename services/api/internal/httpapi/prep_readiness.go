@@ -22,10 +22,11 @@ const (
 
 // readinessResponsesSQL is every graded answer that counts toward readiness:
 // practice, timed papers, and school mock papers. $1 is the school and $2 the
-// students. Timed work and school mocks weigh more than practice with answers shown.
+// students. Timed work and school mocks weigh more than practice with answers
+// shown or work done offline, where no server watched the clock.
 const readinessResponsesSQL = `
 	SELECT ps.student_id,ps.paper,i.question_id,i.is_correct,i.answered_at,
-	       CASE WHEN ps.mode='timed' THEN 1.0 ELSE 0.5 END::float8 AS weight
+	       CASE WHEN ps.mode='timed' AND NOT ps.offline THEN 1.0 ELSE 0.5 END::float8 AS weight
 	FROM prep_session_items i JOIN prep_sessions ps ON ps.id=i.session_id
 	WHERE ps.school_id=$1 AND ps.student_id=ANY($2::uuid[]) AND i.is_correct IS NOT NULL
 	UNION ALL

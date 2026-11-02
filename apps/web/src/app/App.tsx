@@ -46,6 +46,7 @@ const LearnerAccountPage = lazy(() => learnerWorkspace().then((m) => ({ default:
 const PrepHome = lazy(() => learnerWorkspace().then((m) => ({ default: m.PrepHome })))
 const PrepSessionRoute = lazy(() => learnerWorkspace().then((m) => ({ default: m.PrepSessionRoute })))
 const ComputerSkills = lazy(() => learnerWorkspace().then((m) => ({ default: m.ComputerSkills })))
+const OfflineSittingRoute = lazy(() => learnerWorkspace().then((m) => ({ default: m.OfflineSittingRoute })))
 
 // RequireRole shows `render` to a signed-in user with the role, sends anyone
 // else to sign in, and sends other roles to their own workspace.
@@ -132,6 +133,7 @@ export function App() {
         <Route path="prep" element={<PrepHome />} />
         <Route path="prep/computer-skills" element={<ComputerSkills />} />
         <Route path="prep/session/:sessionID" element={<PrepSessionRoute />} />
+        <Route path="prep/offline/:packID" element={<OfflineSittingRoute />} />
         <Route path="*" element={<Navigate to="/learn" replace />} />
       </Route>
       <Route path="*" element={<HomeRedirect />} />

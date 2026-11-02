@@ -66,9 +66,19 @@ Not yet done: Afaan Oromo and Tigrinya (need translators); the public landing pa
 - Readiness: per-paper estimates with a range, a total out of 600 withheld until all six papers have 15 answers, distance from the 300 line, weak topics, a class table and heatmap, and a school view by stream and class. Estimates describe work on the school's own questions and are labelled as not predicting official results.
 - Migration 00016 adds the tables. Practice now feeds skill evidence at half the weight of timed work. New tests cover approval, answer secrecy, grading, expiry, tenancy, mocks and readiness. The student and teacher flows were exercised in a browser with local test questions only. The administrator approval buttons, CSV upload screen and mock paper form were covered by API tests but not clicked through.
 
-Not yet done: downloading practice for offline use and installing as an app, school-wide mock-day scheduling across classes, trend across mock rounds, parent view, SMS or Telegram notices, Afaan Oromo and Tigrinya, and an AI tutor. There are no real exam questions yet: that needs decision 1 in docs/product-plan.md. The 120-minute default for a timed paper is our assumption and should be checked against the official timetable.
+Not yet done: school-wide mock-day scheduling across classes, trend across mock rounds, parent view, SMS or Telegram notices, Afaan Oromo and Tigrinya, and an AI tutor. There are no real exam questions yet: that needs decision 1 in docs/product-plan.md. The 120-minute default for a timed paper is our assumption and should be checked against the official timetable.
 
-Next: real question content, then offline practice and school mock days.
+**2026-11-02 — Offline practice and app install built.**
+
+- The app installs on phones and computers and opens with no connection. A service worker stores the app's files only, never API data. New releases download only changed files, and an update waits until no exam or practice is open.
+- Students download practice per paper. Each pack holds up to 30 practice questions with answers so the device can mark them. Exam-only questions are never included, because anything downloaded should be treated as readable by the student.
+- Drills and client-timed papers run with no connection and save every change on the device. On reconnecting, finished work uploads and the server marks it again, ignoring what the device concluded. Repeating an upload changes nothing. Offline work counts at the practice weight, even when timed, because no server watched the clock.
+- A student stays signed in offline from their last visit, and the server checks again on reconnecting. Signing out with no connection forgets the student and removes downloaded questions at once, and ends the server session on the next connection, so a shared computer is safe. Staff get no offline sign-in.
+- Migration 00017 adds the upload ID. The in-app test browser cannot run service workers, so offline was tested in Microsoft Edge with a throwaway profile, including truly offline, reloading mid-practice, uploading, offline sign-out, and servers being down.
+
+Limits: secure exams and online timed papers cannot be reopened while offline, though their saved answers stay on the device and sync later. Downloaded questions and answers sit unencrypted in browser storage. Installing on real phones, including the iPhone Add to Home Screen path, has not been tested.
+
+Next: real question content, then school mock days.
 
 ---
 

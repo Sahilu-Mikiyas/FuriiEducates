@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParsePrepCSV(t *testing.T) {
@@ -566,4 +567,161 @@ func TestPrepSchoolMockPaperCountsTowardReadiness(t *testing.T) {
 	if !found {
 		t.Fatalf("a school mock should count toward readiness: %v", hub["readiness"])
 	}
+}
+
+func uploadSitting(learner *apiClient, clientID, mode, paper string, questionIDs []string, answers map[string]string) apiResponse {
+	list := []map[string]any{}
+	for questionID, answer := range answers {
+		list = append(list, map[string]any{"question_id": questionID, "answer": answer, "answered_at": time.Now().UTC().Format(time.RFC3339)})
+	}
+	return learner.call("POST", "/student/prep/offline-sittings", map[string]any{"client_id": clientID, "paper": paper, "mode": mode, "started_at": time.Now().UTC().Format(time.RFC3339), "question_ids": questionIDs, "answers": list})
+}
+
+func packQuestionIDs(t *testing.T, learner *apiClient, paper string, count int) ([]string, []any) {
+	t.Helper()
+	pack := learner.call("POST", "/student/prep/packs", map[string]any{"paper": paper, "question_count": count}).expect(http.StatusCreated).object()
+	items := pack["items"].([]any)
+	ids := []string{}
+	for _, raw := range items {
+		ids = append(ids, raw.(map[string]any)["question_id"].(string))
+	}
+	return ids, items
+}
+
+func TestPrepPackHoldsPracticeQuestionsOnly(t *testing.T) {
+	_, admin, _, learner, _, _ := prepFixture(t)
+	learner.call("POST", "/student/prep/packs", map[string]any{"paper": "physics"}).expect(http.StatusConflict)
+	addPrepQuestions(t, admin, "physics", 3, false)
+	addPrepQuestions(t, admin, "physics", 4, true)
+	admin.call("POST", "/student/prep/packs", map[string]any{"paper": "physics"}).expect(http.StatusForbidden)
+	learner.call("POST", "/student/prep/packs", map[string]any{"paper": "cooking"}).expect(http.StatusBadRequest)
+	learner.call("POST", "/student/prep/packs", map[string]any{"paper": "physics", "question_count": 101}).expect(http.StatusBadRequest)
+	_, items := packQuestionIDs(t, learner, "physics", 20)
+	if len(items) != 3 {
+		t.Fatalf("a pack must leave out exam-only questions, got %d", len(items))
+	}
+	first := items[0].(map[string]any)
+	if first["correct_option"] != "A" || first["explanation"] != "Because A is right" || len(first["options"].([]any)) != 4 {
+		t.Fatalf("a pack must carry what the device needs to mark itself: %v", first)
+	}
+}
+
+func TestPrepOfflineSittingIsMarkedByTheServerAndCountedOnce(t *testing.T) {
+	_, admin, _, learner, _, _ := prepFixture(t)
+	addPrepQuestions(t, admin, "history", 4, false)
+	ids, _ := packQuestionIDs(t, learner, "history", 4)
+	clientID := "11111111-1111-4111-8111-111111111111"
+	answers := map[string]string{ids[0]: "A", ids[1]: "B", ids[2]: "Z"}
+
+	result := uploadSitting(learner, clientID, "drill", "history", ids, answers).expect(http.StatusCreated).object()
+	if result["correct_count"] != float64(1) || result["answered_count"] != float64(2) || result["score_out_of_100"] != float64(50) {
+		t.Fatalf("one right of two valid answers: %v", result)
+	}
+	// A retry after a lost reply returns the same result and records nothing new.
+	again := uploadSitting(learner, clientID, "drill", "history", ids, map[string]string{ids[0]: "A", ids[1]: "A", ids[2]: "A", ids[3]: "A"}).expect(http.StatusOK).object()
+	if again["id"] != result["id"] || again["correct_count"] != float64(1) {
+		t.Fatalf("a repeated upload must not change the result: %v", again)
+	}
+	var sittings, evidence int
+	var weight float64
+	ctx := context.Background()
+	if err := testDB.QueryRow(ctx, `SELECT count(*) FROM prep_sessions WHERE client_id=$1`, clientID).Scan(&sittings); err != nil {
+		t.Fatal(err)
+	}
+	if err := testDB.QueryRow(ctx, `SELECT count(*),sum(evidence_weight)::float8 FROM skill_evidence WHERE prep_session_id=$1`, result["id"]).Scan(&evidence, &weight); err != nil {
+		t.Fatal(err)
+	}
+	if sittings != 1 || evidence != 2 || weight != 2*prepPracticeWeight {
+		t.Fatalf("sittings=%d evidence=%d weight=%v", sittings, evidence, weight)
+	}
+
+	// A wrong offline answer comes back for review like any other.
+	if _, err := testDB.Exec(ctx, `UPDATE prep_session_items SET answered_at=now()-interval '2 days' WHERE session_id=$1`, result["id"]); err != nil {
+		t.Fatal(err)
+	}
+	review := startSession(learner, map[string]any{"mode": "review", "paper": "history"})
+	if items := review["items"].([]any); len(items) != 1 || items[0].(map[string]any)["question_id"] != ids[1] {
+		t.Fatalf("review should bring back the wrong offline answer: %v", items)
+	}
+}
+
+func TestPrepOfflineTimedCountsBlanksWrongAtPracticeWeight(t *testing.T) {
+	_, admin, _, learner, _, _ := prepFixture(t)
+	addPrepQuestions(t, admin, "biology", 4, false)
+	ids, _ := packQuestionIDs(t, learner, "biology", 4)
+	result := uploadSitting(learner, "22222222-2222-4222-8222-222222222222", "timed", "biology", ids, map[string]string{ids[0]: "A"}).expect(http.StatusCreated).object()
+	if result["score_out_of_100"] != float64(25) {
+		t.Fatalf("one of four is 25: %v", result)
+	}
+	var weight float64
+	if err := testDB.QueryRow(context.Background(), `SELECT sum(evidence_weight)::float8 FROM skill_evidence WHERE prep_session_id=$1`, result["id"]).Scan(&weight); err != nil {
+		t.Fatal(err)
+	}
+	if weight != 4*prepPracticeWeight {
+		t.Fatalf("offline timed work should count at the practice weight, got %v", weight)
+	}
+	hub := learner.call("GET", "/student/prep", nil).expect(http.StatusOK).object()
+	if active := hub["active_session"].(map[string]any); len(active) != 0 {
+		t.Fatalf("an uploaded sitting must not stay open: %v", active)
+	}
+}
+
+func TestPrepOfflineUploadRejectsQuestionsItCannotUse(t *testing.T) {
+	server, admin, _, learner, _, _ := prepFixture(t)
+	addPrepQuestions(t, admin, "geography", 2, false)
+	addPrepQuestions(t, admin, "economics", 1, false)
+	ids, _ := packQuestionIDs(t, learner, "geography", 2)
+	wrongPaper, _ := packQuestionIDs(t, learner, "economics", 1)
+	addPrepQuestions(t, admin, "geography", 1, true)
+	var examOnly string
+	if err := testDB.QueryRow(context.Background(), `SELECT id::text FROM questions WHERE exam_only AND status='published' ORDER BY created_at DESC LIMIT 1`).Scan(&examOnly); err != nil {
+		t.Fatal(err)
+	}
+	_, otherAdmin := seedSchool(t, server)
+	addPrepQuestions(t, otherAdmin, "geography", 1, false)
+	var foreign string
+	if err := testDB.QueryRow(context.Background(), `SELECT q.id::text FROM questions q WHERE q.school_id<>(SELECT school_id FROM questions WHERE id=$1) ORDER BY q.created_at DESC LIMIT 1`, ids[0]).Scan(&foreign); err != nil {
+		t.Fatal(err)
+	}
+	for name, questionIDs := range map[string][]string{"another paper": {ids[0], wrongPaper[0]}, "exam-only": {ids[0], examOnly}, "another school": {ids[0], foreign}} {
+		response := uploadSitting(learner, uuid(t), "drill", "geography", questionIDs, map[string]string{ids[0]: "A"})
+		if response.Status != http.StatusBadRequest {
+			t.Fatalf("%s: expected a refusal, got %d", name, response.Status)
+		}
+	}
+	learner.call("POST", "/student/prep/offline-sittings", map[string]any{"client_id": "not-a-uuid", "paper": "geography", "mode": "drill", "question_ids": ids}).expect(http.StatusBadRequest)
+	learner.call("POST", "/student/prep/offline-sittings", map[string]any{"client_id": uuid(t), "paper": "geography", "mode": "weak", "question_ids": ids}).expect(http.StatusBadRequest)
+	var saved int
+	if err := testDB.QueryRow(context.Background(), `SELECT count(*) FROM prep_sessions WHERE offline AND paper='geography'`).Scan(&saved); err != nil {
+		t.Fatal(err)
+	}
+	if saved != 0 {
+		t.Fatalf("a refused upload must save nothing, got %d", saved)
+	}
+}
+
+func TestClampOfflineTime(t *testing.T) {
+	now := time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)
+	if got := clampOfflineTime(now.Add(time.Hour), now); !got.Equal(now) {
+		t.Fatalf("a future time should become now, got %v", got)
+	}
+	if got := clampOfflineTime(time.Time{}, now); !got.Equal(now) {
+		t.Fatalf("a missing time should become now, got %v", got)
+	}
+	if got := clampOfflineTime(now.Add(-24*time.Hour*365), now); !got.Equal(now.Add(-maxOfflineAge)) {
+		t.Fatalf("an old time should be limited, got %v", got)
+	}
+	recent := now.Add(-time.Hour)
+	if got := clampOfflineTime(recent, now); !got.Equal(recent) {
+		t.Fatalf("a recent time should be kept, got %v", got)
+	}
+}
+
+func uuid(t *testing.T) string {
+	t.Helper()
+	var value string
+	if err := testDB.QueryRow(context.Background(), `SELECT gen_random_uuid()::text`).Scan(&value); err != nil {
+		t.Fatal(err)
+	}
+	return value
 }

@@ -168,6 +168,21 @@ paths:
       responses:
         '201': { description: Success }
         '401': { description: Authentication required }
+  /student/prep/packs:
+    post:
+      summary: Download practice questions with their answers for offline use. Never includes exam-only questions
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /student/prep/offline-sittings:
+    post:
+      summary: Upload practice done offline. The server marks it, and repeating an upload with the same client_id changes nothing
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Recorded }
+        '200': { description: Already recorded }
+        '401': { description: Authentication required }
   /demo-requests:
     post:
       summary: Submit a public school setup request
