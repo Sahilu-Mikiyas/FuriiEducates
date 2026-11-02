@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/furii/school-os/services/api/internal/auth"
 	"github.com/jackc/pgx/v5"
@@ -15,11 +16,12 @@ func (a *API) registerAssessmentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/assessments", a.admin(a.createAssessment))
 	mux.HandleFunc("POST /api/v1/assessments/{assessmentID}/publish", a.admin(a.publishAssessment))
 	mux.HandleFunc("POST /api/v1/assessments/{assessmentID}/assignments", a.admin(a.assignAssessment))
+	mux.HandleFunc("PATCH /api/v1/assignments/{assignmentID}", a.admin(a.updateAssignment))
 }
 
 func (a *API) listAssessments(w http.ResponseWriter, r *http.Request, id auth.Identity) {
 	rows, err := a.db.Query(r.Context(), `
-		SELECT a.id::text,a.title,a.instructions,a.status,a.created_at::text,a.duration_minutes,
+		SELECT a.id::text,a.title,a.instructions,a.status,a.created_at::text,a.duration_minutes,a.shuffle_questions,a.shuffle_options,a.locked_mode,
 		       (SELECT count(*)::int FROM assessment_items ai WHERE ai.assessment_id=a.id),
 		       COALESCE((SELECT array_agg(ai.question_id::text ORDER BY ai.position) FROM assessment_items ai WHERE ai.assessment_id=a.id),'{}'),
 		       COALESCE((SELECT array_agg(aa.class_id::text ORDER BY aa.assigned_at) FROM assessment_assignments aa WHERE aa.assessment_id=a.id),'{}')
@@ -37,6 +39,9 @@ func (a *API) listAssessments(w http.ResponseWriter, r *http.Request, id auth.Id
 		Status           string   `json:"status"`
 		CreatedAt        string   `json:"created_at"`
 		DurationMinutes  int      `json:"duration_minutes"`
+		ShuffleQuestions bool     `json:"shuffle_questions"`
+		ShuffleOptions   bool     `json:"shuffle_options"`
+		LockedMode       bool     `json:"locked_mode"`
 		QuestionCount    int      `json:"question_count"`
 		QuestionIDs      []string `json:"question_ids"`
 		AssignedClassIDs []string `json:"assigned_class_ids"`
@@ -44,7 +49,7 @@ func (a *API) listAssessments(w http.ResponseWriter, r *http.Request, id auth.Id
 	items := []item{}
 	for rows.Next() {
 		var x item
-		if err := rows.Scan(&x.ID, &x.Title, &x.Instructions, &x.Status, &x.CreatedAt, &x.DurationMinutes, &x.QuestionCount, &x.QuestionIDs, &x.AssignedClassIDs); err != nil {
+		if err := rows.Scan(&x.ID, &x.Title, &x.Instructions, &x.Status, &x.CreatedAt, &x.DurationMinutes, &x.ShuffleQuestions, &x.ShuffleOptions, &x.LockedMode, &x.QuestionCount, &x.QuestionIDs, &x.AssignedClassIDs); err != nil {
 			a.serverError(w, r, err)
 			return
 		}
@@ -65,10 +70,13 @@ func (a *API) listAssessments(w http.ResponseWriter, r *http.Request, id auth.Id
 
 func (a *API) createAssessment(w http.ResponseWriter, r *http.Request, id auth.Identity) {
 	var req struct {
-		Title           string   `json:"title"`
-		Instructions    string   `json:"instructions"`
-		QuestionIDs     []string `json:"question_ids"`
-		DurationMinutes int      `json:"duration_minutes"`
+		Title            string   `json:"title"`
+		Instructions     string   `json:"instructions"`
+		QuestionIDs      []string `json:"question_ids"`
+		DurationMinutes  int      `json:"duration_minutes"`
+		ShuffleQuestions bool     `json:"shuffle_questions"`
+		ShuffleOptions   bool     `json:"shuffle_options"`
+		LockedMode       bool     `json:"locked_mode"`
 	}
 	if !decode(w, r, &req) {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON request.", nil)
@@ -95,7 +103,7 @@ func (a *API) createAssessment(w http.ResponseWriter, r *http.Request, id auth.I
 	}
 	defer tx.Rollback(r.Context())
 	var assessmentID string
-	err = tx.QueryRow(r.Context(), `INSERT INTO assessments(school_id,title,instructions,duration_minutes,created_by) VALUES($1,$2,$3,$4,$5) RETURNING id::text`, id.SchoolID, req.Title, req.Instructions, req.DurationMinutes, id.UserID).Scan(&assessmentID)
+	err = tx.QueryRow(r.Context(), `INSERT INTO assessments(school_id,title,instructions,duration_minutes,created_by,shuffle_questions,shuffle_options,locked_mode) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id::text`, id.SchoolID, req.Title, req.Instructions, req.DurationMinutes, id.UserID, req.ShuffleQuestions, req.ShuffleOptions, req.LockedMode).Scan(&assessmentID)
 	if err != nil {
 		a.serverError(w, r, err)
 		return
@@ -179,10 +187,18 @@ func (a *API) publishAssessment(w http.ResponseWriter, r *http.Request, id auth.
 
 func (a *API) assignAssessment(w http.ResponseWriter, r *http.Request, id auth.Identity) {
 	var req struct {
-		ClassID string `json:"class_id"`
+		ClassID           string  `json:"class_id"`
+		OpensAt           *string `json:"opens_at"`
+		DueAt             *string `json:"due_at"`
+		RequiresStartCode bool    `json:"requires_start_code"`
 	}
-	if !decode(w, r, &req) || strings.TrimSpace(req.ClassID) == "" {
+	if !decode(w, r, &req) || !uuidPattern.MatchString(strings.TrimSpace(req.ClassID)) {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Choose a class.", nil)
+		return
+	}
+	opensAt, dueAt, message := parseAssignmentWindow(req.OpensAt, req.DueAt)
+	if message != "" {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", message, nil)
 		return
 	}
 	assessmentID := r.PathValue("assessmentID")
@@ -201,7 +217,7 @@ func (a *API) assignAssessment(w http.ResponseWriter, r *http.Request, id auth.I
 		return
 	}
 	var assignmentID string
-	err = a.db.QueryRow(r.Context(), `INSERT INTO assessment_assignments(school_id,assessment_id,class_id,assigned_by) SELECT $1,a.id,c.id,$4 FROM assessments a JOIN classes c ON c.id=$3 AND c.school_id=$1 WHERE a.id=$2 AND a.school_id=$1 RETURNING id::text`, id.SchoolID, assessmentID, req.ClassID, id.UserID).Scan(&assignmentID)
+	err = a.db.QueryRow(r.Context(), `INSERT INTO assessment_assignments(school_id,assessment_id,class_id,assigned_by,opens_at,due_at,requires_start_code) SELECT $1,a.id,c.id,$4,$5,$6,$7 FROM assessments a JOIN classes c ON c.id=$3 AND c.school_id=$1 WHERE a.id=$2 AND a.school_id=$1 RETURNING id::text`, id.SchoolID, assessmentID, req.ClassID, id.UserID, opensAt, dueAt, req.RequiresStartCode).Scan(&assignmentID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -224,4 +240,64 @@ func (a *API) assignAssessment(w http.ResponseWriter, r *http.Request, id auth.I
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"data": map[string]string{"id": assignmentID, "assessment_id": assessmentID, "class_id": req.ClassID}})
+}
+
+// parseAssignmentWindow validates optional RFC 3339 opening and due times.
+// It returns a message for the user when they are invalid.
+func parseAssignmentWindow(opensAt, dueAt *string) (*time.Time, *time.Time, string) {
+	parse := func(raw *string) (*time.Time, bool) {
+		if raw == nil || strings.TrimSpace(*raw) == "" {
+			return nil, true
+		}
+		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*raw))
+		if err != nil {
+			return nil, false
+		}
+		return &parsed, true
+	}
+	opens, ok := parse(opensAt)
+	if !ok {
+		return nil, nil, "The opening time is not valid."
+	}
+	due, ok := parse(dueAt)
+	if !ok {
+		return nil, nil, "The due time is not valid."
+	}
+	if opens != nil && due != nil && !due.After(*opens) {
+		return nil, nil, "The due time must be after the opening time."
+	}
+	return opens, due, ""
+}
+
+// updateAssignment changes when a class assignment opens and closes, for
+// example to extend a due date. Attempts already started keep their deadlines.
+func (a *API) updateAssignment(w http.ResponseWriter, r *http.Request, id auth.Identity) {
+	var req struct {
+		OpensAt *string `json:"opens_at"`
+		DueAt   *string `json:"due_at"`
+	}
+	if !decode(w, r, &req) {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON request.", nil)
+		return
+	}
+	opensAt, dueAt, message := parseAssignmentWindow(req.OpensAt, req.DueAt)
+	if message != "" {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", message, nil)
+		return
+	}
+	assignmentID := r.PathValue("assignmentID")
+	tag, err := a.db.Exec(r.Context(), `UPDATE assessment_assignments SET opens_at=$3,due_at=$4 WHERE id=$1 AND school_id=$2`, assignmentID, id.SchoolID, opensAt, dueAt)
+	if err != nil {
+		a.databaseError(w, r, err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "Assignment not found.", nil)
+		return
+	}
+	if err = a.auditExam(r, id, "assessment.assignment_updated", "assessment_assignment", assignmentID, map[string]any{"opens_at": opensAt, "due_at": dueAt}); err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"id": assignmentID, "opens_at": opensAt, "due_at": dueAt}})
 }

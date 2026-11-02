@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -17,6 +18,7 @@ import (
 	"github.com/furii/school-os/services/api/internal/auth"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const studentInviteTTL = 7 * 24 * time.Hour
@@ -240,42 +242,88 @@ func (a *API) listStudentAssessments(w http.ResponseWriter, r *http.Request, id 
 	writeJSON(w, 200, map[string]any{"data": items})
 }
 
-func (a *API) studentAssignment(w http.ResponseWriter, r *http.Request, id auth.Identity) (string, string) {
+// studentAssignmentView is an assignment as a student in its class may see it.
+type studentAssignmentView struct {
+	StudentID         string
+	Title             string
+	Instructions      string
+	DurationMinutes   int
+	QuestionCount     int
+	RequiresStartCode bool
+	SessionOpen       bool
+	StartCode         *string
+	LockedMode        bool
+	OpensAt           *string
+	DueAt             *string
+	NotOpenYet        bool
+	PastDue           bool
+}
+
+// studentAssignment loads the assignment for the signed-in student, writing
+// the error response and returning false when they cannot see it.
+func (a *API) studentAssignment(w http.ResponseWriter, r *http.Request, id auth.Identity) (studentAssignmentView, bool) {
+	var view studentAssignmentView
 	studentID, err := a.learnerStudent(r, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, 403, "STUDENT_PROFILE_UNAVAILABLE", "No active student profile is linked to this account.", nil)
-		return "", ""
+		return view, false
 	}
 	if err != nil {
 		a.serverError(w, r, err)
-		return "", ""
+		return view, false
 	}
-	var title, instructions string
-	err = a.db.QueryRow(r.Context(), `SELECT a.title,a.instructions FROM assessment_assignments aa JOIN assessments a ON a.id=aa.assessment_id AND a.school_id=aa.school_id JOIN enrollments e ON e.class_id=aa.class_id AND e.school_id=aa.school_id AND e.student_id=$3 AND e.status='active' WHERE aa.id=$1 AND aa.school_id=$2 AND a.status='published'`, r.PathValue("assignmentID"), id.SchoolID, studentID).Scan(&title, &instructions)
+	view.StudentID = studentID
+	err = a.db.QueryRow(r.Context(), `
+		SELECT a.title,a.instructions,a.duration_minutes,
+		       (SELECT count(*)::int FROM assessment_items ai WHERE ai.assessment_id=a.id),
+		       aa.requires_start_code,aa.session_open,aa.start_code,a.locked_mode,
+		       to_char(aa.opens_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+		       to_char(aa.due_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+		       COALESCE(aa.opens_at>now(),FALSE),COALESCE(aa.due_at<=now(),FALSE)
+		FROM assessment_assignments aa
+		JOIN assessments a ON a.id=aa.assessment_id AND a.school_id=aa.school_id
+		JOIN enrollments e ON e.class_id=aa.class_id AND e.school_id=aa.school_id AND e.student_id=$3 AND e.status='active'
+		WHERE aa.id=$1 AND aa.school_id=$2 AND a.status='published'`, r.PathValue("assignmentID"), id.SchoolID, studentID).Scan(
+		&view.Title, &view.Instructions, &view.DurationMinutes, &view.QuestionCount, &view.RequiresStartCode, &view.SessionOpen, &view.StartCode, &view.LockedMode, &view.OpensAt, &view.DueAt, &view.NotOpenYet, &view.PastDue)
 	if errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, 404, "NOT_FOUND", "This assessment is not assigned to your active class.", nil)
-		return "", ""
+		return view, false
 	}
 	if err != nil {
 		a.serverError(w, r, err)
-		return "", ""
+		return view, false
 	}
-	return studentID, title + "\x00" + instructions
+	return view, true
 }
 
+// getStudentAssessment returns the assignment summary. Questions are only
+// included once the student has an attempt, so nobody can read an exam before
+// its timer starts. An attempt past its deadline is finalized first.
 func (a *API) getStudentAssessment(w http.ResponseWriter, r *http.Request, id auth.Identity) {
-	studentID, combined := a.studentAssignment(w, r, id)
-	if studentID == "" {
+	view, ok := a.studentAssignment(w, r, id)
+	if !ok {
 		return
 	}
-	title, instructions, _ := strings.Cut(combined, "\x00")
+	assignmentID := r.PathValue("assignmentID")
+	var expiredAttempt string
+	err := a.db.QueryRow(r.Context(), `SELECT id::text FROM assessment_attempts WHERE assignment_id=$1 AND student_id=$2 AND status='in_progress' AND `+attemptExpiredSQL, assignmentID, view.StudentID).Scan(&expiredAttempt)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		a.serverError(w, r, err)
+		return
+	}
+	if expiredAttempt != "" {
+		if err := finalizeExpiredAttempt(r.Context(), a.db, id.SchoolID, expiredAttempt); err != nil {
+			a.serverError(w, r, err)
+			return
+		}
+	}
 	var attemptID, status string
 	var deadlineAt *string
 	var score, maxScore *float64
 	var manualReview int
 	var resultsReleased bool
 	var finalScore, finalMax *float64
-	err := a.db.QueryRow(r.Context(), `SELECT id::text,status,score::float8,max_score::float8,(SELECT count(*)::int FROM assessment_answers WHERE attempt_id=assessment_attempts.id AND is_correct IS NULL AND answer IS NOT NULL AND answer <> 'null'::jsonb AND reviewed_at IS NULL),results_released,final_score::float8,final_max_score::float8,deadline_at::text FROM assessment_attempts WHERE assignment_id=$1 AND student_id=$2`, r.PathValue("assignmentID"), studentID).Scan(&attemptID, &status, &score, &maxScore, &manualReview, &resultsReleased, &finalScore, &finalMax, &deadlineAt)
+	err = a.db.QueryRow(r.Context(), `SELECT id::text,status,score::float8,max_score::float8,(SELECT count(*)::int FROM assessment_answers WHERE attempt_id=assessment_attempts.id AND is_correct IS NULL AND answer IS NOT NULL AND answer <> 'null'::jsonb AND reviewed_at IS NULL),results_released,final_score::float8,final_max_score::float8,to_char(deadline_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') FROM assessment_attempts WHERE assignment_id=$1 AND student_id=$2`, assignmentID, view.StudentID).Scan(&attemptID, &status, &score, &maxScore, &manualReview, &resultsReleased, &finalScore, &finalMax, &deadlineAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		attemptID = ""
 		status = "not_started"
@@ -284,12 +332,6 @@ func (a *API) getStudentAssessment(w http.ResponseWriter, r *http.Request, id au
 		a.serverError(w, r, err)
 		return
 	}
-	rows, err := a.db.Query(r.Context(), `SELECT q.id::text,COALESCE(snapshot.question_snapshot->>'question_type',q.question_type),COALESCE(snapshot.question_snapshot->'prompt',q.prompt),COALESCE(snapshot.question_snapshot->'options',q.options),COALESCE(snapshot.points::text,ai.points::text),answers.answer,CASE WHEN at.results_released THEN answers.awarded_points::text ELSE '' END,CASE WHEN at.results_released THEN answers.feedback ELSE '' END,COALESCE(answers.revision,0),COALESCE(answers.flagged,FALSE) FROM assessment_items ai JOIN questions q ON q.id=ai.question_id AND q.school_id=ai.school_id LEFT JOIN assessment_attempts at ON at.assignment_id=$1 AND at.student_id=$3 LEFT JOIN assessment_attempt_items snapshot ON snapshot.attempt_id=at.id AND snapshot.question_id=q.id LEFT JOIN assessment_answers answers ON answers.attempt_id=at.id AND answers.question_id=q.id WHERE ai.assessment_id=(SELECT assessment_id FROM assessment_assignments WHERE id=$1 AND school_id=$2) ORDER BY COALESCE(snapshot.position,ai.position)`, r.PathValue("assignmentID"), id.SchoolID, studentID)
-	if err != nil {
-		a.serverError(w, r, err)
-		return
-	}
-	defer rows.Close()
 	type assessmentQuestion struct {
 		ID       string          `json:"id"`
 		Type     string          `json:"question_type"`
@@ -303,44 +345,124 @@ func (a *API) getStudentAssessment(w http.ResponseWriter, r *http.Request, id au
 		Flagged  bool            `json:"flagged"`
 	}
 	questions := []assessmentQuestion{}
-	for rows.Next() {
-		var q assessmentQuestion
-		if err = rows.Scan(&q.ID, &q.Type, &q.Prompt, &q.Options, &q.Points, &q.Answer, &q.Awarded, &q.Feedback, &q.Revision, &q.Flagged); err != nil {
+	if attemptID != "" {
+		rows, err := a.db.Query(r.Context(), `
+			SELECT item.question_id::text,item.question_snapshot->>'question_type',item.question_snapshot->'prompt',item.question_snapshot->'options',item.points::text,
+			       answers.answer,
+			       CASE WHEN $2 THEN answers.awarded_points::text ELSE '' END,
+			       CASE WHEN $2 THEN answers.feedback ELSE '' END,
+			       COALESCE(answers.revision,0),COALESCE(answers.flagged,FALSE)
+			FROM assessment_attempt_items item
+			LEFT JOIN assessment_answers answers ON answers.attempt_id=item.attempt_id AND answers.question_id=item.question_id
+			WHERE item.attempt_id=$1
+			ORDER BY item.position`, attemptID, resultsReleased)
+		if err != nil {
 			a.serverError(w, r, err)
 			return
 		}
-		questions = append(questions, q)
+		defer rows.Close()
+		for rows.Next() {
+			var q assessmentQuestion
+			var awarded, feedback *string
+			if err = rows.Scan(&q.ID, &q.Type, &q.Prompt, &q.Options, &q.Points, &q.Answer, &awarded, &feedback, &q.Revision, &q.Flagged); err != nil {
+				a.serverError(w, r, err)
+				return
+			}
+			if awarded != nil {
+				q.Awarded = *awarded
+			}
+			if feedback != nil {
+				q.Feedback = *feedback
+			}
+			questions = append(questions, q)
+		}
+		if err = rows.Err(); err != nil {
+			a.serverError(w, r, err)
+			return
+		}
 	}
-	if err = rows.Err(); err != nil {
-		a.serverError(w, r, err)
-		return
-	}
-	writeJSON(w, 200, map[string]any{"data": map[string]any{"assignment_id": r.PathValue("assignmentID"), "title": title, "instructions": instructions, "status": status, "attempt_id": attemptID, "deadline_at": deadlineAt, "score": score, "max_score": maxScore, "results_released": resultsReleased, "final_score": finalScore, "final_max_score": finalMax, "manual_review_count": manualReview, "questions": questions}})
+	writeJSON(w, 200, map[string]any{"data": map[string]any{
+		"assignment_id": assignmentID, "title": view.Title, "instructions": view.Instructions, "status": status, "attempt_id": attemptID,
+		"deadline_at": deadlineAt, "score": score, "max_score": maxScore, "results_released": resultsReleased,
+		"final_score": finalScore, "final_max_score": finalMax, "manual_review_count": manualReview, "questions": questions,
+		"question_count": view.QuestionCount, "duration_minutes": view.DurationMinutes, "requires_start_code": view.RequiresStartCode,
+		"session_open": view.SessionOpen, "locked_mode": view.LockedMode, "opens_at": view.OpensAt, "due_at": view.DueAt,
+		"not_open_yet": view.NotOpenYet, "past_due": view.PastDue,
+	}})
 }
 
+// startStudentAssessment creates the attempt, snapshotting the questions and
+// setting the server deadline. A student who already started gets the same
+// attempt back with no further checks, so a reconnecting student is never
+// locked out by a closed session or a changed start code.
 func (a *API) startStudentAssessment(w http.ResponseWriter, r *http.Request, id auth.Identity) {
-	studentID, err := a.learnerStudent(r, id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		writeError(w, 403, "STUDENT_PROFILE_UNAVAILABLE", "No active student profile is linked to this account.", nil)
+	var req struct {
+		StartCode string `json:"start_code"`
+	}
+	if !decode(w, r, &req) {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid start request.", nil)
 		return
 	}
-	if err != nil {
+	view, ok := a.studentAssignment(w, r, id)
+	if !ok {
+		return
+	}
+	assignmentID := r.PathValue("assignmentID")
+	respond := func(attemptID, status, deadline string) {
+		writeJSON(w, http.StatusCreated, map[string]any{"data": map[string]string{"attempt_id": attemptID, "status": status, "deadline_at": deadline}})
+	}
+	const deadlineText = `to_char(deadline_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`
+	var attemptID, status, deadline string
+	err := a.db.QueryRow(r.Context(), `SELECT id::text,status,`+deadlineText+` FROM assessment_attempts WHERE assignment_id=$1 AND student_id=$2`, assignmentID, view.StudentID).Scan(&attemptID, &status, &deadline)
+	if err == nil {
+		respond(attemptID, status, deadline)
+		return
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
 		a.serverError(w, r, err)
 		return
+	}
+	if view.NotOpenYet {
+		writeError(w, http.StatusConflict, "ASSESSMENT_NOT_OPEN", "This assessment has not opened yet.", nil)
+		return
+	}
+	if view.PastDue {
+		writeError(w, http.StatusConflict, "ASSESSMENT_CLOSED", "The time to start this assessment has passed.", nil)
+		return
+	}
+	if view.RequiresStartCode {
+		if !view.SessionOpen || view.StartCode == nil {
+			writeError(w, http.StatusConflict, "SESSION_NOT_OPEN", "Wait for your invigilator to open this exam session.", nil)
+			return
+		}
+		failureKey := "start-code:" + id.UserID
+		if blocked, retry := a.limiter.blocked(failureKey, a.limits.startCodeFailuresPerUser, time.Now()); blocked {
+			writeRateLimited(w, retry)
+			return
+		}
+		if !strings.EqualFold(strings.TrimSpace(req.StartCode), *view.StartCode) {
+			a.limiter.hit(failureKey, a.limits.startCodeFailuresPerUser, time.Now())
+			writeError(w, http.StatusForbidden, "START_CODE_INVALID", "That start code is not correct. Check the code shown by your invigilator.", nil)
+			return
+		}
+		a.limiter.reset(failureKey)
 	}
 	tx, err := a.db.Begin(r.Context())
 	if err != nil {
 		a.serverError(w, r, err)
 		return
 	}
-	defer tx.Rollback(r.Context())
-	var alreadyStarted bool
-	if err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM assessment_attempts WHERE assignment_id=$1 AND student_id=$2)`, r.PathValue("assignmentID"), studentID).Scan(&alreadyStarted); err != nil {
-		a.serverError(w, r, err)
-		return
-	}
-	var attemptID, status, deadline string
-	err = tx.QueryRow(r.Context(), `INSERT INTO assessment_attempts(school_id,assignment_id,student_id,max_score,deadline_at) SELECT aa.school_id,aa.id,$3,(SELECT COALESCE(sum(ai.points),0) FROM assessment_items ai JOIN questions q ON q.id=ai.question_id AND q.school_id=ai.school_id WHERE ai.assessment_id=aa.assessment_id AND q.question_type<>'text'),CASE WHEN aa.due_at IS NOT NULL THEN LEAST(now()+make_interval(mins=>a.duration_minutes),aa.due_at) ELSE now()+make_interval(mins=>a.duration_minutes) END FROM assessment_assignments aa JOIN assessments a ON a.id=aa.assessment_id AND a.school_id=aa.school_id JOIN enrollments e ON e.class_id=aa.class_id AND e.school_id=aa.school_id AND e.student_id=$3 AND e.status='active' WHERE aa.id=$1 AND aa.school_id=$2 AND a.status='published' AND (aa.due_at IS NULL OR aa.due_at>now()) ON CONFLICT(assignment_id,student_id) DO UPDATE SET assignment_id=EXCLUDED.assignment_id RETURNING id::text,status,deadline_at::text`, r.PathValue("assignmentID"), id.SchoolID, studentID).Scan(&attemptID, &status, &deadline)
+	defer tx.Rollback(context.Background())
+	err = tx.QueryRow(r.Context(), `
+		INSERT INTO assessment_attempts(school_id,assignment_id,student_id,max_score,deadline_at)
+		SELECT aa.school_id,aa.id,$3,
+		       (SELECT COALESCE(sum(ai.points),0) FROM assessment_items ai JOIN questions q ON q.id=ai.question_id AND q.school_id=ai.school_id WHERE ai.assessment_id=aa.assessment_id AND q.question_type<>'text'),
+		       CASE WHEN aa.due_at IS NOT NULL THEN LEAST(now()+make_interval(mins=>a.duration_minutes),aa.due_at) ELSE now()+make_interval(mins=>a.duration_minutes) END
+		FROM assessment_assignments aa
+		JOIN assessments a ON a.id=aa.assessment_id AND a.school_id=aa.school_id
+		WHERE aa.id=$1 AND aa.school_id=$2 AND a.status='published'
+		ON CONFLICT(assignment_id,student_id) DO UPDATE SET assignment_id=EXCLUDED.assignment_id
+		RETURNING id::text,status,`+deadlineText, assignmentID, id.SchoolID, view.StudentID).Scan(&attemptID, &status, &deadline)
 	if errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, 404, "NOT_FOUND", "This assessment is not assigned to your active class.", nil)
 		return
@@ -349,25 +471,36 @@ func (a *API) startStudentAssessment(w http.ResponseWriter, r *http.Request, id 
 		a.serverError(w, r, err)
 		return
 	}
-	if status == "in_progress" {
-		_, err = tx.Exec(r.Context(), `INSERT INTO assessment_attempt_items(attempt_id,school_id,question_id,position,points,question_snapshot) SELECT at.id,at.school_id,ai.question_id,ai.position,ai.points,jsonb_build_object('question_type',q.question_type,'prompt',q.prompt,'options',q.options,'answer_key',q.answer_key,'explanation',q.explanation) FROM assessment_attempts at JOIN assessment_assignments aa ON aa.id=at.assignment_id AND aa.school_id=at.school_id JOIN assessment_items ai ON ai.assessment_id=aa.assessment_id AND ai.school_id=aa.school_id JOIN questions q ON q.id=ai.question_id AND q.school_id=ai.school_id WHERE at.id=$1 ON CONFLICT(attempt_id,question_id) DO NOTHING`, attemptID)
-		if err != nil {
-			a.serverError(w, r, err)
-			return
-		}
-		if !alreadyStarted {
-			_, err = tx.Exec(r.Context(), `INSERT INTO assessment_attempt_events(school_id,attempt_id,event_type,event_data) VALUES($1,$2,'started',jsonb_build_object('deadline_at',$3::text))`, id.SchoolID, attemptID, deadline)
-			if err != nil {
-				a.serverError(w, r, err)
-				return
-			}
-		}
+	// Each attempt gets its own question order and answer-option order when the
+	// assessment asks for shuffling. Grading uses option IDs, so order is safe.
+	_, err = tx.Exec(r.Context(), `
+		INSERT INTO assessment_attempt_items(attempt_id,school_id,question_id,position,points,question_snapshot)
+		SELECT at.id,at.school_id,ai.question_id,
+		       (CASE WHEN a.shuffle_questions THEN row_number() OVER (ORDER BY random()) ELSE row_number() OVER (ORDER BY ai.position) END)::int,
+		       ai.points,
+		       jsonb_build_object('question_type',q.question_type,'prompt',q.prompt,
+		           'options',CASE WHEN a.shuffle_options AND jsonb_typeof(q.options)='array' THEN (SELECT jsonb_agg(option_item ORDER BY random()) FROM jsonb_array_elements(q.options) AS option_item) ELSE q.options END,
+		           'answer_key',q.answer_key,'explanation',q.explanation)
+		FROM assessment_attempts at
+		JOIN assessment_assignments aa ON aa.id=at.assignment_id AND aa.school_id=at.school_id
+		JOIN assessments a ON a.id=aa.assessment_id AND a.school_id=aa.school_id
+		JOIN assessment_items ai ON ai.assessment_id=aa.assessment_id AND ai.school_id=aa.school_id
+		JOIN questions q ON q.id=ai.question_id AND q.school_id=ai.school_id
+		WHERE at.id=$1
+		ON CONFLICT(attempt_id,question_id) DO NOTHING`, attemptID)
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	if _, err = tx.Exec(r.Context(), `INSERT INTO assessment_attempt_events(school_id,attempt_id,event_type,event_data) VALUES($1,$2,'started',jsonb_build_object('deadline_at',$3::text))`, id.SchoolID, attemptID, deadline); err != nil {
+		a.serverError(w, r, err)
+		return
 	}
 	if err = tx.Commit(r.Context()); err != nil {
 		a.serverError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]string{"attempt_id": attemptID, "status": status, "deadline_at": deadline})
+	respond(attemptID, status, deadline)
 }
 
 func (a *API) saveStudentAnswer(w http.ResponseWriter, r *http.Request, id auth.Identity) {
@@ -399,7 +532,7 @@ func (a *API) saveStudentAnswer(w http.ResponseWriter, r *http.Request, id auth.
 	defer tx.Rollback(r.Context())
 	var status string
 	var expired bool
-	err = tx.QueryRow(r.Context(), `SELECT status,now()>=deadline_at FROM assessment_attempts WHERE id=$1 AND school_id=$2 AND student_id=$3 FOR UPDATE`, r.PathValue("attemptID"), id.SchoolID, studentID).Scan(&status, &expired)
+	err = tx.QueryRow(r.Context(), `SELECT status,`+attemptExpiredSQL+` FROM assessment_attempts WHERE id=$1 AND school_id=$2 AND student_id=$3 FOR UPDATE`, r.PathValue("attemptID"), id.SchoolID, studentID).Scan(&status, &expired)
 	if errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, 404, "NOT_FOUND", "Assessment attempt not found.", nil)
 		return
@@ -492,11 +625,11 @@ func (a *API) submitStudentAssessment(w http.ResponseWriter, r *http.Request, id
 		a.serverError(w, r, err)
 		return
 	}
-	defer tx.Rollback(r.Context())
+	defer tx.Rollback(context.Background())
 	attemptID := r.PathValue("attemptID")
 	var status string
 	var expired bool
-	err = tx.QueryRow(r.Context(), `SELECT status,now()>=deadline_at FROM assessment_attempts WHERE id=$1 AND school_id=$2 AND student_id=$3 FOR UPDATE`, attemptID, id.SchoolID, studentID).Scan(&status, &expired)
+	err = tx.QueryRow(r.Context(), `SELECT status,`+attemptExpiredSQL+` FROM assessment_attempts WHERE id=$1 AND school_id=$2 AND student_id=$3 FOR UPDATE`, attemptID, id.SchoolID, studentID).Scan(&status, &expired)
 	if errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, 404, "NOT_FOUND", "Assessment attempt not found.", nil)
 		return
@@ -519,43 +652,80 @@ func (a *API) submitStudentAssessment(w http.ResponseWriter, r *http.Request, id
 		writeJSON(w, 200, map[string]any{"data": map[string]any{"attempt_id": attemptID, "status": "submitted", "auto_score": score, "auto_max_score": maxScore, "results_released": released, "idempotent_replay": true}})
 		return
 	}
-	stored, queryErr := tx.Query(r.Context(), `SELECT question_id::text,answer FROM assessment_answers WHERE attempt_id=$1 AND answer IS NOT NULL`, attemptID)
-	if queryErr != nil {
-		a.serverError(w, r, queryErr)
-		return
-	}
-	savedAnswers := map[string]json.RawMessage{}
-	for stored.Next() {
-		var qid string
-		var answer json.RawMessage
-		if queryErr = stored.Scan(&qid, &answer); queryErr != nil {
-			stored.Close()
-			a.serverError(w, r, queryErr)
-			return
-		}
-		savedAnswers[qid] = answer
-	}
-	if queryErr = stored.Err(); queryErr != nil {
-		stored.Close()
-		a.serverError(w, r, queryErr)
-		return
-	}
-	stored.Close()
+	// After the deadline and grace window only server-saved answers count.
+	payload := req.Answers
+	eventType := "submitted"
 	if expired {
-		req.Answers = savedAnswers
-	} else {
-		if req.Answers == nil {
-			req.Answers = map[string]json.RawMessage{}
-		}
-		for questionID, answer := range req.Answers {
-			savedAnswers[questionID] = answer
-		}
-		req.Answers = savedAnswers
+		payload = nil
+		eventType = "deadline_submission"
 	}
-	rows, err := tx.Query(r.Context(), `SELECT question_id::text,question_snapshot->>'question_type',question_snapshot->'answer_key',points::float8 FROM assessment_attempt_items WHERE attempt_id=$1 AND school_id=$2 ORDER BY position`, attemptID, id.SchoolID)
+	actor := id.UserID
+	result, err := finalizeAttempt(r.Context(), tx, id.SchoolID, attemptID, &actor, payload, eventType)
+	var invalid *invalidAnswerError
+	if errors.As(err, &invalid) {
+		writeError(w, 400, "INVALID_ANSWER", invalid.message, nil)
+		return
+	}
 	if err != nil {
 		a.serverError(w, r, err)
 		return
+	}
+	if err = tx.Commit(r.Context()); err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	var finalScore, finalMaxScore any
+	if result.NeedsReview == 0 {
+		finalScore, finalMaxScore = result.Total, result.FinalMax
+	}
+	writeJSON(w, 200, map[string]any{"data": map[string]any{"attempt_id": attemptID, "status": "submitted", "auto_score": result.Total, "auto_max_score": result.Max, "manual_review_count": result.NeedsReview, "results_released": result.NeedsReview == 0, "final_score": finalScore, "final_max_score": finalMaxScore, "deadline_submission": expired}})
+}
+
+// attemptExpiredSQL is true once an attempt's deadline and grace window have
+// passed. The grace window lets answers already on their way when the timer
+// reaches zero still count; the student's clock stops at the deadline itself.
+const attemptExpiredSQL = `now() >= deadline_at + interval '30 seconds'`
+
+type attemptResult struct {
+	Total, Max, FinalMax float64
+	NeedsReview          int
+}
+
+type invalidAnswerError struct{ message string }
+
+func (e *invalidAnswerError) Error() string { return e.message }
+
+// finalizeAttempt grades an in-progress attempt from its question snapshot
+// and marks it submitted. The caller must hold the attempt's row lock in tx.
+// payload answers, when given, override saved answers. actor is nil when the
+// server finalizes an abandoned attempt.
+func finalizeAttempt(ctx context.Context, tx pgx.Tx, schoolID, attemptID string, actor *string, payload map[string]json.RawMessage, eventType string) (attemptResult, error) {
+	var result attemptResult
+	stored, err := tx.Query(ctx, `SELECT question_id::text,answer FROM assessment_answers WHERE attempt_id=$1 AND answer IS NOT NULL`, attemptID)
+	if err != nil {
+		return result, err
+	}
+	answers := map[string]json.RawMessage{}
+	for stored.Next() {
+		var questionID string
+		var answer json.RawMessage
+		if err = stored.Scan(&questionID, &answer); err != nil {
+			stored.Close()
+			return result, err
+		}
+		answers[questionID] = answer
+	}
+	if err = stored.Err(); err != nil {
+		stored.Close()
+		return result, err
+	}
+	stored.Close()
+	for questionID, answer := range payload {
+		answers[questionID] = answer
+	}
+	rows, err := tx.Query(ctx, `SELECT question_id::text,question_snapshot->>'question_type',question_snapshot->'answer_key',points::float8 FROM assessment_attempt_items WHERE attempt_id=$1 AND school_id=$2 ORDER BY position`, attemptID, schoolID)
+	if err != nil {
+		return result, err
 	}
 	type gradingItem struct {
 		id, kind string
@@ -567,93 +737,124 @@ func (a *API) submitStudentAssessment(w http.ResponseWriter, r *http.Request, id
 		var item gradingItem
 		if err = rows.Scan(&item.id, &item.kind, &item.key, &item.points); err != nil {
 			rows.Close()
-			a.serverError(w, r, err)
-			return
+			return result, err
 		}
 		items = append(items, item)
 	}
 	if err = rows.Err(); err != nil {
 		rows.Close()
-		a.serverError(w, r, err)
-		return
+		return result, err
 	}
 	rows.Close()
 	valid := map[string]bool{}
 	for _, item := range items {
 		valid[item.id] = true
 	}
-	for questionID := range req.Answers {
+	for questionID := range answers {
 		if !valid[questionID] {
-			writeError(w, 400, "INVALID_ANSWER", "Submission contains a question outside this assessment.", nil)
-			return
+			return result, &invalidAnswerError{"Submission contains a question outside this assessment."}
 		}
 	}
-	var total, max float64
-	var needsReview int
 	for _, item := range items {
-		answer := bytesTrimJSON(req.Answers[item.id])
+		answer := bytesTrimJSON(answers[item.id])
 		if len(answer) == 0 {
 			answer = []byte("null")
 		}
 		if !json.Valid(answer) {
-			writeError(w, 400, "INVALID_ANSWER", "An answer is not valid JSON.", nil)
-			return
+			return result, &invalidAnswerError{"An answer is not valid JSON."}
 		}
 		correct, manual := gradeAnswer(item.kind, item.key, answer)
 		if manual {
-			needsReview++
+			result.NeedsReview++
 		}
 		awarded := 0.0
 		if correct {
 			awarded = item.points
 		}
 		if !manual {
-			max += item.points
+			result.Max += item.points
 		}
-		total += awarded
+		result.FinalMax += item.points
+		result.Total += awarded
 		var isCorrect any
 		if !manual {
 			isCorrect = correct
 		}
-		if _, err = tx.Exec(r.Context(), `INSERT INTO assessment_answers(attempt_id,school_id,question_id,answer,is_correct,awarded_points,saved_at) VALUES($1,$2,$3,$4,$5,$6,now()) ON CONFLICT(attempt_id,question_id) DO UPDATE SET answer=EXCLUDED.answer,is_correct=EXCLUDED.is_correct,awarded_points=EXCLUDED.awarded_points,saved_at=now()`, attemptID, id.SchoolID, item.id, answer, isCorrect, awarded); err != nil {
-			a.serverError(w, r, err)
-			return
+		if _, err = tx.Exec(ctx, `INSERT INTO assessment_answers(attempt_id,school_id,question_id,answer,is_correct,awarded_points,saved_at) VALUES($1,$2,$3,$4,$5,$6,now()) ON CONFLICT(attempt_id,question_id) DO UPDATE SET answer=EXCLUDED.answer,is_correct=EXCLUDED.is_correct,awarded_points=EXCLUDED.awarded_points,saved_at=now()`, attemptID, schoolID, item.id, answer, isCorrect, awarded); err != nil {
+			return result, err
 		}
 	}
-	var finalMax float64
-	if err = tx.QueryRow(r.Context(), `SELECT COALESCE(sum(ai.points),0)::float8 FROM assessment_items ai WHERE ai.assessment_id=(SELECT aa.assessment_id FROM assessment_assignments aa JOIN assessment_attempts at ON at.assignment_id=aa.id WHERE at.id=$1)`, attemptID).Scan(&finalMax); err != nil {
-		a.serverError(w, r, err)
-		return
+	if _, err = tx.Exec(ctx, `UPDATE assessment_attempts SET status='submitted',submitted_at=now(),score=$2::numeric,max_score=$3::numeric,results_released=($4::int=0),final_score=CASE WHEN $4::int=0 THEN $2::numeric ELSE NULL END,final_max_score=CASE WHEN $4::int=0 THEN $5::numeric ELSE NULL END WHERE id=$1`, attemptID, result.Total, result.Max, result.NeedsReview, result.FinalMax); err != nil {
+		return result, err
 	}
-	if _, err = tx.Exec(r.Context(), `UPDATE assessment_attempts SET status='submitted',submitted_at=now(),score=$2::numeric,max_score=$3::numeric,results_released=($4::int=0),final_score=CASE WHEN $4::int=0 THEN $2::numeric ELSE NULL END,final_max_score=CASE WHEN $4::int=0 THEN $5::numeric ELSE NULL END WHERE id=$1`, attemptID, total, max, needsReview, finalMax); err != nil {
-		a.serverError(w, r, err)
-		return
+	if err = updateLearningIntelligence(ctx, tx, schoolID, attemptID); err != nil {
+		return result, err
 	}
-	if err = updateLearningIntelligence(r.Context(), tx, id.SchoolID, attemptID); err != nil {
-		a.serverError(w, r, err)
-		return
+	if _, err = tx.Exec(ctx, `INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'assessment.submitted','assessment_attempt',$3,jsonb_build_object('auto_score',$4::numeric,'auto_max_score',$5::numeric,'manual_review_count',$6::int,'event',$7::text))`, schoolID, actor, attemptID, result.Total, result.Max, result.NeedsReview, eventType); err != nil {
+		return result, err
 	}
-	if _, err = tx.Exec(r.Context(), `INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'assessment.submitted','assessment_attempt',$3,jsonb_build_object('auto_score',$4::numeric,'auto_max_score',$5::numeric,'manual_review_count',$6::int))`, id.SchoolID, id.UserID, attemptID, total, max, needsReview); err != nil {
-		a.serverError(w, r, err)
-		return
+	if _, err = tx.Exec(ctx, `INSERT INTO assessment_attempt_events(school_id,attempt_id,event_type,event_data) VALUES($1,$2,$3,jsonb_build_object('auto_score',$4::numeric,'manual_review_count',$5::int))`, schoolID, attemptID, eventType, result.Total, result.NeedsReview); err != nil {
+		return result, err
 	}
-	eventType := "submitted"
-	if expired {
-		eventType = "deadline_submission"
+	return result, nil
+}
+
+// finalizeExpiredAttempt grades one attempt whose deadline has passed, using
+// only server-saved answers. Another request holding the row lock wins; this
+// call then does nothing.
+func finalizeExpiredAttempt(ctx context.Context, db *pgxpool.Pool, schoolID, attemptID string) error {
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return err
 	}
-	if _, err = tx.Exec(r.Context(), `INSERT INTO assessment_attempt_events(school_id,attempt_id,event_type,event_data) VALUES($1,$2,$3,jsonb_build_object('auto_score',$4::numeric,'manual_review_count',$5::int))`, id.SchoolID, attemptID, eventType, total, needsReview); err != nil {
-		a.serverError(w, r, err)
-		return
+	defer tx.Rollback(context.Background())
+	var status string
+	var expired bool
+	err = tx.QueryRow(ctx, `SELECT status,`+attemptExpiredSQL+` FROM assessment_attempts WHERE id=$1 AND school_id=$2 FOR UPDATE SKIP LOCKED`, attemptID, schoolID).Scan(&status, &expired)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
 	}
-	if err = tx.Commit(r.Context()); err != nil {
-		a.serverError(w, r, err)
-		return
+	if err != nil {
+		return err
 	}
-	var finalScore, finalMaxScore any
-	if needsReview == 0 {
-		finalScore, finalMaxScore = total, finalMax
+	if status != "in_progress" || !expired {
+		return nil
 	}
-	writeJSON(w, 200, map[string]any{"data": map[string]any{"attempt_id": attemptID, "status": "submitted", "auto_score": total, "auto_max_score": max, "manual_review_count": needsReview, "results_released": needsReview == 0, "final_score": finalScore, "final_max_score": finalMaxScore, "deadline_submission": expired}})
+	if _, err = finalizeAttempt(ctx, tx, schoolID, attemptID, nil, nil, "deadline_submission"); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// finalizeExpiredAttempts grades a batch of abandoned attempts, so a student
+// who closed the tab still gets a result. Returns how many were examined.
+func finalizeExpiredAttempts(ctx context.Context, db *pgxpool.Pool) (int, error) {
+	rows, err := db.Query(ctx, `SELECT id::text,school_id::text FROM assessment_attempts WHERE status='in_progress' AND `+attemptExpiredSQL+` ORDER BY deadline_at LIMIT 200`)
+	if err != nil {
+		return 0, err
+	}
+	type target struct{ attemptID, schoolID string }
+	targets := []target{}
+	for rows.Next() {
+		var item target
+		if err = rows.Scan(&item.attemptID, &item.schoolID); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		targets = append(targets, item)
+	}
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return 0, err
+	}
+	rows.Close()
+	var firstErr error
+	for _, item := range targets {
+		if err := finalizeExpiredAttempt(ctx, db, item.schoolID, item.attemptID); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return len(targets), firstErr
 }
 
 func bytesTrimJSON(raw json.RawMessage) []byte { return []byte(strings.TrimSpace(string(raw))) }

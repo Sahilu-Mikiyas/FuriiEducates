@@ -38,6 +38,37 @@ func StartMaintenance(ctx context.Context, db *pgxpool.Pool, log *slog.Logger, e
 	}()
 }
 
+// StartAttemptFinalizer grades attempts whose deadline has passed, once at
+// start and then on every interval until ctx is cancelled. A sleeping free-tier
+// instance catches up when it wakes.
+func StartAttemptFinalizer(ctx context.Context, db *pgxpool.Pool, log *slog.Logger, every time.Duration) {
+	go func() {
+		run := func() {
+			count, err := finalizeExpiredAttempts(ctx, db)
+			if err != nil {
+				if ctx.Err() == nil {
+					log.Error("finalizing expired attempts failed", "error", err)
+				}
+				return
+			}
+			if count > 0 {
+				log.Info("finalized expired attempts", "attempts", count)
+			}
+		}
+		run()
+		ticker := time.NewTicker(every)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				run()
+			}
+		}
+	}()
+}
+
 // purgeExpiredRecords deletes sessions that expired or were revoked more than
 // a day ago, and password reset links that expired more than 30 days ago.
 func purgeExpiredRecords(ctx context.Context, db *pgxpool.Pool) (int64, int64, error) {

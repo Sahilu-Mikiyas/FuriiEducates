@@ -101,7 +101,7 @@ func requireDB(t *testing.T) {
 // many times from one address.
 func testRateLimits() rateLimits {
 	generous := limitRule{limit: 100000, window: time.Minute}
-	return rateLimits{loginPerIP: generous, loginFailuresPerAccount: generous, tokenRedemptionsPerIP: generous, demoRequestsPerIP: generous, passwordFailuresPerUser: generous}
+	return rateLimits{loginPerIP: generous, loginFailuresPerAccount: generous, tokenRedemptionsPerIP: generous, demoRequestsPerIP: generous, passwordFailuresPerUser: generous, startCodeFailuresPerUser: generous}
 }
 
 func newTestServer(t *testing.T) *httptest.Server {

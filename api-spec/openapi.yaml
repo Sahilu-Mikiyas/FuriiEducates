@@ -396,6 +396,9 @@ paths:
                 title: { type: string, minLength: 1, maxLength: 200 }
                 instructions: { type: string, maxLength: 5000 }
                 duration_minutes: { type: integer, minimum: 5, maximum: 240 }
+                shuffle_questions: { type: boolean, description: Give each attempt its own question order }
+                shuffle_options: { type: boolean, description: Give each attempt its own answer-choice order }
+                locked_mode: { type: boolean, description: Full-screen page that reports leaving the exam window }
                 question_ids:
                   type: array
                   minItems: 1
@@ -435,6 +438,9 @@ paths:
               required: [class_id]
               properties:
                 class_id: { type: string, format: uuid }
+                opens_at: { type: [string, 'null'], format: date-time }
+                due_at: { type: [string, 'null'], format: date-time }
+                requires_start_code: { type: boolean, description: Invigilated; students need the code from an open session }
       responses:
         '201': { description: Assessment assigned to the class }
         '404': { description: Assessment or class not found }
@@ -491,9 +497,10 @@ paths:
         schema: { type: string, format: uuid }
     get:
       summary: Read the assigned assessment without server-side answer keys
+      description: Questions are returned only after the student has started. Before that the response has the question count, duration, and window. An attempt past its deadline and grace window is finalized first.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { description: Assessment and learner-facing questions }
+        '200': { description: Assessment summary, and learner-facing questions once started }
         '404': { description: Assessment is not assigned to an active class }
   /student/assessments/{assignmentID}/start:
     parameters:
@@ -503,9 +510,22 @@ paths:
         schema: { type: string, format: uuid }
     post:
       summary: Start or resume the student's single attempt
+      description: A student who already started resumes with no further checks, so closing a session never locks out someone reconnecting.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start_code: { type: string, description: Required when the assignment is invigilated }
       responses:
         '201': { description: Attempt created or resumed }
+        '403': { description: Wrong start code (START_CODE_INVALID) }
+        '404': { description: Not assigned to this student's active class }
+        '409': { description: Not open yet (ASSESSMENT_NOT_OPEN), past due (ASSESSMENT_CLOSED), or session not open (SESSION_NOT_OPEN) }
+        '429': { description: Too many wrong start codes (RATE_LIMITED) }
   /student/attempts/{attemptID}/answers/{questionID}:
     parameters:
       - name: attemptID
@@ -975,6 +995,179 @@ paths:
         '201': { description: Link issued, including the one-time token }
         '403': { description: Not a platform operator }
         '404': { description: No school administrator uses that email }
+  /assignments/{assignmentID}:
+    parameters:
+      - { name: assignmentID, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Change when a class assignment opens and closes
+      description: Omitted times are cleared. Attempts already started keep their deadlines.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                opens_at: { type: [string, 'null'], format: date-time }
+                due_at: { type: [string, 'null'], format: date-time }
+      responses:
+        '200': { description: Assignment updated }
+        '400': { description: Invalid times, or due time is not after the opening time }
+        '404': { description: Assignment not found }
+  /student/attempts/{attemptID}/integrity-events:
+    parameters:
+      - { name: attemptID, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Report a signal from a locked exam page
+      description: Signals are for an invigilator to review and are not proof of cheating. Capped at 500 per attempt; finished attempts and other students' attempts return recorded false.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { type: string, enum: [tab_hidden, window_blur, fullscreen_exit, paste_attempt, copy_attempt] }
+      responses:
+        '200': { description: Whether the signal was recorded }
+        '400': { description: Unknown signal }
+  /exam-sessions:
+    get:
+      summary: List exam sessions the user can invigilate
+      description: Administrators see the whole school; teachers see their assigned classes.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Sessions with enrolled, in-progress, and submitted counts }
+  /exam-sessions/{assignmentID}:
+    parameters:
+      - { name: assignmentID, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Read the invigilator console
+      description: Session state, the start code, and each enrolled student's live status.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Session and roster }
+        '403': { description: Teacher is not assigned to this class }
+        '404': { description: Session not found in this school }
+  /exam-sessions/{assignmentID}/open:
+    parameters:
+      - { name: assignmentID, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Open an invigilated session and issue a new start code
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Session open; returns the start code }
+        '409': { description: This assignment does not use a start code }
+  /exam-sessions/{assignmentID}/close:
+    parameters:
+      - { name: assignmentID, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Close a session so no new students can start
+      description: Students who already started can continue and reconnect.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Session closed }
+  /exam-sessions/{assignmentID}/attempts/{attemptID}/events:
+    parameters:
+      - { name: assignmentID, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: attemptID, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Read an attempt's timeline, leaving out routine autosaves
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Events in time order }
+  /exam-sessions/{assignmentID}/attempts/{attemptID}/extend:
+    parameters:
+      - { name: assignmentID, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: attemptID, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Give one student extra time
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [minutes]
+              properties:
+                minutes: { type: integer, minimum: 1, maximum: 240 }
+                reason: { type: string, maxLength: 1000 }
+      responses:
+        '200': { description: New deadline }
+        '404': { description: Student has not started }
+        '409': { description: Attempt already submitted }
+  /exam-sessions/{assignmentID}/attempts/{attemptID}/finish:
+    parameters:
+      - { name: assignmentID, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: attemptID, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: End one student's attempt now, grading saved answers
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Attempt submitted }
+        '409': { description: Attempt already submitted }
+  /exam-sessions/{assignmentID}/attempts/{attemptID}/incident:
+    parameters:
+      - { name: assignmentID, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: attemptID, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Record an incident against a student's attempt
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note: { type: string, minLength: 1, maxLength: 2000 }
+      responses:
+        '201': { description: Incident recorded }
+        '404': { description: Student has not started }
+  /gradebook:
+    get:
+      summary: Read one result per student per assessment for a class
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: class_id, in: query, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Assessment columns and student rows }
+        '400': { description: Missing or malformed class }
+        '403': { description: Class is not in this school or not assigned to this teacher }
+  /reviews:
+    get:
+      summary: List written answers awaiting grading in any class of the school
+      description: Administrator counterpart of /teacher/reviews, so results are not stuck when a class has no teacher.
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: class_id, in: query, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Written answers with grading guides }
+  /attempts/{attemptID}/answers/{questionID}/grade:
+    parameters:
+      - { name: attemptID, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: questionID, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      summary: Grade a written answer as a school administrator
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [points]
+              properties:
+                points: { type: number, minimum: 0 }
+                feedback: { type: string, maxLength: 5000 }
+      responses:
+        '200': { description: Grade saved; the result is released when nothing remains to grade }
+        '404': { description: Written response not found }
 components:
   securitySchemes:
     sessionCookie:

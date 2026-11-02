@@ -52,6 +52,14 @@ The root `render.yaml` prepares a small Render web service for `services/api`. C
 
 Users change their own password from their workspace; this signs out their other devices. A school administrator can issue a one-time, 24-hour password reset link for a teacher (Staff access page) or a learner (Students page). A platform operator can issue one for a locked-out school administrator through `POST /api/v1/platform/password-resets`. Links are shown once and must be shared privately; there is no email delivery yet. Login is rate limited per client address and per account (10 failed attempts lock the account for 15 minutes). Expired sessions and old reset links are purged hourly.
 
+### Secure exams
+
+Assessments can give each student a different question and answer-choice order, and run in locked mode: a full-screen page that records leaving the exam window, switching tabs, and copy or paste attempts. A browser cannot truly lock a device, so these are signals for an invigilator to review, not proof of cheating.
+
+When assigning to a class, an administrator can set opening and due times and mark it invigilated. An invigilator (an administrator or a teacher assigned to the class) opens the session on the Exam sessions page and shares the six-character start code in the room. The console shows each student's live status, and staff can add time, record an incident, read a student's timeline, or finish an attempt. Closing a session stops new starts but never locks out a student already in the exam.
+
+Questions stay on the server until a student starts. The server owns the clock: answers already on their way get a 30-second grace window after the deadline, and an attempt abandoned past that is graded automatically from its saved answers. Teachers and administrators see per-student results in a gradebook with CSV download, and administrators can grade written answers when a class has no teacher.
+
 ### Curriculum ownership
 
 Each curriculum belongs to the school that created it and is invisible to other schools. Curricula without an owning school form a read-only platform library that every school can use, for example to publish an official national curriculum once.

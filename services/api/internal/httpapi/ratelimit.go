@@ -17,20 +17,22 @@ type limitRule struct {
 // a whole school, or a computer lab sitting an exam, often shares one public
 // address. Brute-force protection comes from the per-account failure limit.
 type rateLimits struct {
-	loginPerIP              limitRule
-	loginFailuresPerAccount limitRule
-	tokenRedemptionsPerIP   limitRule
-	demoRequestsPerIP       limitRule
-	passwordFailuresPerUser limitRule
+	loginPerIP               limitRule
+	loginFailuresPerAccount  limitRule
+	tokenRedemptionsPerIP    limitRule
+	demoRequestsPerIP        limitRule
+	passwordFailuresPerUser  limitRule
+	startCodeFailuresPerUser limitRule
 }
 
 func defaultRateLimits() rateLimits {
 	return rateLimits{
-		loginPerIP:              limitRule{limit: 120, window: time.Minute},
-		loginFailuresPerAccount: limitRule{limit: 10, window: 15 * time.Minute},
-		tokenRedemptionsPerIP:   limitRule{limit: 30, window: 10 * time.Minute},
-		demoRequestsPerIP:       limitRule{limit: 10, window: time.Hour},
-		passwordFailuresPerUser: limitRule{limit: 10, window: 15 * time.Minute},
+		loginPerIP:               limitRule{limit: 120, window: time.Minute},
+		loginFailuresPerAccount:  limitRule{limit: 10, window: 15 * time.Minute},
+		tokenRedemptionsPerIP:    limitRule{limit: 30, window: 10 * time.Minute},
+		demoRequestsPerIP:        limitRule{limit: 10, window: time.Hour},
+		passwordFailuresPerUser:  limitRule{limit: 10, window: 15 * time.Minute},
+		startCodeFailuresPerUser: limitRule{limit: 10, window: 5 * time.Minute},
 	}
 }
 

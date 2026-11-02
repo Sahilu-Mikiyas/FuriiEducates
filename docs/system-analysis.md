@@ -33,6 +33,19 @@ Next: Phase 1 (security and tenancy).
 
 Next: Phase 2 (exam correctness), merged with secure exams v1 per docs/product-plan.md.
 
+**2026-11-02 — Phase 2 (exam correctness and secure exams v1) completed.**
+
+- P0-4 fixed: questions are returned only after an attempt starts. Abandoned attempts are graded from saved answers by a server job every minute, and when next opened. Answers in flight at the deadline get a 30-second grace window, and the browser now sends queued answers before its deadline submission. Assignments can have opening and due times.
+- Score totals now come from the attempt snapshot rather than live assessment items (P1-11). The start-attempt response uses the normal data envelope (part of P1-13).
+- Administrators can grade written answers when a class has no teacher (P1-3). Teachers and administrators have a gradebook with CSV download (P1-4).
+- Secure exams v1 (Module B in docs/product-plan.md): per-student question and option shuffling, invigilated sessions with start codes and limited guesses, an invigilator console with live status, added time, incidents, timelines and forced finish, and a locked mode that records leaving the exam window as signals for review.
+- Migration 00015 adds the exam settings. Tests cover all of the above, and the whole flow was exercised in a browser.
+- CI fixes: `go.mod` now requires Go 1.27.3, and govulncheck moved to v1.9.0 because v1.1.4 crashes on Linux with Go 1.27. Earlier CI runs never reached the test steps.
+
+Not yet done from Module B: exam blueprints that draw from the bank by topic and difficulty, item analysis, moderation before release, an on-site exam server, and locked-down native apps.
+
+Next: Phase 3 (frontend restructure), with languages and the Ethiopian calendar.
+
 ---
 
 ## 1. What the system is today

@@ -26,14 +26,16 @@ Written 2026-11-01. Companion to [system-analysis.md](system-analysis.md), which
 
 - **System audit** (2026-10-31): every file reviewed, problems ranked P0 to P2, phased fix plan.
 - **Phase 0, safety net** (2026-11-01, pushed to main): first automated tests, CI quality gates, dependency upgrades, and two production exam bugs fixed. Autosave had always failed, and timed-out students lost their answers.
+- **Phase 1, security and tenancy** (2026-11-01, pushed to main): school-private curricula, first-party login cookie, password change and reset links, rate limits.
+- **Phase 2, exam correctness and secure exams v1** (2026-11-02): hidden questions until start, server-side finalizing, due dates, gradebook, admin grading, shuffling, start codes, invigilator console, locked mode.
 
 ### Foundation work still required before real schools
 
 These come from the system analysis and are non-negotiable before real student data:
 
-1. **Phase 1, security and tenancy:** scope curricula per school, make sign-in work on Safari and iPhone, rate limits, password reset.
-2. **Phase 2, exam correctness:** hide questions before start, server-side auto-finalize, due dates, admin grading fallback, gradebook.
-3. **Phase 3, frontend restructure:** split the single 90 KB screen file into routed pages. Every module below depends on this.
+1. **Phase 3, frontend restructure:** split the single large screen file into routed pages. Every module below depends on this.
+
+Phases 1 and 2, listed under Completed so far, were the other two requirements.
 
 ---
 

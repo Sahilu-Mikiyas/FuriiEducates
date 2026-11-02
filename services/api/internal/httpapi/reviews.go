@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -11,23 +12,28 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// Teachers grade written answers for their assigned classes. Administrators
+// can grade for any class in the school, so results are never stuck when a
+// class has no teacher.
 func (a *API) registerReviewRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/teacher/reviews", a.teacher(a.listTeacherReviews))
-	mux.HandleFunc("PUT /api/v1/teacher/attempts/{attemptID}/answers/{questionID}", a.teacher(a.gradeTeacherAnswer))
+	mux.HandleFunc("GET /api/v1/teacher/reviews", a.teacher(a.listReviews))
+	mux.HandleFunc("PUT /api/v1/teacher/attempts/{attemptID}/answers/{questionID}", a.teacher(a.gradeAnswer))
+	mux.HandleFunc("GET /api/v1/reviews", a.admin(a.listReviews))
+	mux.HandleFunc("PUT /api/v1/attempts/{attemptID}/answers/{questionID}/grade", a.admin(a.gradeAnswer))
 }
 
-func (a *API) listTeacherReviews(w http.ResponseWriter, r *http.Request, id auth.Identity) {
+func (a *API) listReviews(w http.ResponseWriter, r *http.Request, id auth.Identity) {
 	classID := strings.TrimSpace(r.URL.Query().Get("class_id"))
-	if classID == "" {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Choose one of your assigned classes.", nil)
+	if !uuidPattern.MatchString(classID) {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Choose a class.", nil)
 		return
 	}
-	var assigned bool
-	if err := a.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM class_teachers WHERE school_id=$1 AND teacher_id=$2 AND class_id=$3)`, id.SchoolID, id.UserID, classID).Scan(&assigned); err != nil {
+	allowed, err := a.canManageClass(r.Context(), id, classID)
+	if err != nil {
 		a.serverError(w, r, err)
 		return
 	}
-	if !assigned {
+	if !allowed {
 		writeError(w, http.StatusForbidden, "FORBIDDEN", "You are not assigned to this class.", nil)
 		return
 	}
@@ -39,12 +45,11 @@ func (a *API) listTeacherReviews(w http.ResponseWriter, r *http.Request, id auth
 		FROM assessment_attempts at
 		JOIN assessment_assignments aa ON aa.id=at.assignment_id AND aa.school_id=at.school_id
 		JOIN assessments a ON a.id=aa.assessment_id AND a.school_id=aa.school_id
-		JOIN class_teachers ct ON ct.class_id=aa.class_id AND ct.school_id=aa.school_id AND ct.teacher_id=$2
 		JOIN students s ON s.id=at.student_id AND s.school_id=at.school_id
 		JOIN assessment_attempt_items item ON item.attempt_id=at.id AND item.school_id=at.school_id AND item.question_snapshot->>'question_type'='text'
 		JOIN assessment_answers ans ON ans.attempt_id=at.id AND ans.question_id=item.question_id
-		WHERE at.school_id=$1 AND aa.class_id=$3 AND at.status='submitted' AND ans.answer IS NOT NULL AND ans.answer <> 'null'::jsonb AND ans.reviewed_at IS NULL
-		ORDER BY at.submitted_at,s.legal_name,item.position LIMIT 500`, id.SchoolID, id.UserID, classID)
+		WHERE at.school_id=$1 AND aa.class_id=$2 AND at.status='submitted' AND ans.answer IS NOT NULL AND ans.answer <> 'null'::jsonb AND ans.reviewed_at IS NULL
+		ORDER BY at.submitted_at,s.legal_name,item.position LIMIT 500`, id.SchoolID, classID)
 	if err != nil {
 		a.serverError(w, r, err)
 		return
@@ -83,7 +88,7 @@ func (a *API) listTeacherReviews(w http.ResponseWriter, r *http.Request, id auth
 	writeJSON(w, http.StatusOK, map[string]any{"data": items})
 }
 
-func (a *API) gradeTeacherAnswer(w http.ResponseWriter, r *http.Request, id auth.Identity) {
+func (a *API) gradeAnswer(w http.ResponseWriter, r *http.Request, id auth.Identity) {
 	var req struct {
 		Points   *float64 `json:"points"`
 		Feedback string   `json:"feedback"`
@@ -98,9 +103,12 @@ func (a *API) gradeTeacherAnswer(w http.ResponseWriter, r *http.Request, id auth
 		a.serverError(w, r, err)
 		return
 	}
-	defer tx.Rollback(r.Context())
-	var status string
-	err = tx.QueryRow(r.Context(), `SELECT status FROM assessment_attempts WHERE id=$1 AND school_id=$2 FOR UPDATE`, attemptID, id.SchoolID).Scan(&status)
+	defer tx.Rollback(context.Background())
+	var status, classID string
+	err = tx.QueryRow(r.Context(), `
+		SELECT at.status,aa.class_id::text FROM assessment_attempts at
+		JOIN assessment_assignments aa ON aa.id=at.assignment_id AND aa.school_id=at.school_id
+		WHERE at.id=$1 AND at.school_id=$2 FOR UPDATE OF at`, attemptID, id.SchoolID).Scan(&status, &classID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "Assessment attempt not found.", nil)
 		return
@@ -109,18 +117,24 @@ func (a *API) gradeTeacherAnswer(w http.ResponseWriter, r *http.Request, id auth
 		a.serverError(w, r, err)
 		return
 	}
+	allowed, err := a.canManageClass(r.Context(), id, classID)
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	if !allowed {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "Written response was not found in a class assigned to you.", nil)
+		return
+	}
 	if status != "submitted" {
 		writeError(w, http.StatusConflict, "ATTEMPT_NOT_SUBMITTED", "Only submitted assessment answers can be graded.", nil)
 		return
 	}
 	var maxPoints float64
 	err = tx.QueryRow(r.Context(), `
-		SELECT item.points::float8 FROM assessment_attempts at
-		JOIN assessment_assignments aa ON aa.id=at.assignment_id AND aa.school_id=at.school_id
-		JOIN class_teachers ct ON ct.class_id=aa.class_id AND ct.school_id=aa.school_id AND ct.teacher_id=$3
-		JOIN assessment_attempt_items item ON item.attempt_id=at.id AND item.school_id=at.school_id AND item.question_id=$4 AND item.question_snapshot->>'question_type'='text'
-		JOIN assessment_answers ans ON ans.attempt_id=at.id AND ans.question_id=item.question_id AND ans.answer IS NOT NULL AND ans.answer <> 'null'::jsonb
-		WHERE at.id=$1 AND at.school_id=$2`, attemptID, id.SchoolID, id.UserID, questionID).Scan(&maxPoints)
+		SELECT item.points::float8 FROM assessment_attempt_items item
+		JOIN assessment_answers ans ON ans.attempt_id=item.attempt_id AND ans.question_id=item.question_id AND ans.answer IS NOT NULL AND ans.answer <> 'null'::jsonb
+		WHERE item.attempt_id=$1 AND item.question_id=$2 AND item.question_snapshot->>'question_type'='text'`, attemptID, questionID).Scan(&maxPoints)
 	if errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "Written response was not found in a class assigned to you.", nil)
 		return
@@ -139,7 +153,10 @@ func (a *API) gradeTeacherAnswer(w http.ResponseWriter, r *http.Request, id auth
 		return
 	}
 	var pending int
-	if err = tx.QueryRow(r.Context(), `SELECT count(*)::int FROM assessment_answers ans JOIN questions q ON q.id=ans.question_id AND q.school_id=ans.school_id WHERE ans.attempt_id=$1 AND q.question_type='text' AND ans.answer IS NOT NULL AND ans.answer <> 'null'::jsonb AND ans.reviewed_at IS NULL`, attemptID).Scan(&pending); err != nil {
+	if err = tx.QueryRow(r.Context(), `
+		SELECT count(*)::int FROM assessment_answers ans
+		JOIN assessment_attempt_items item ON item.attempt_id=ans.attempt_id AND item.question_id=ans.question_id
+		WHERE ans.attempt_id=$1 AND item.question_snapshot->>'question_type'='text' AND ans.answer IS NOT NULL AND ans.answer <> 'null'::jsonb AND ans.reviewed_at IS NULL`, attemptID).Scan(&pending); err != nil {
 		a.serverError(w, r, err)
 		return
 	}
@@ -149,7 +166,7 @@ func (a *API) gradeTeacherAnswer(w http.ResponseWriter, r *http.Request, id auth
 		err = tx.QueryRow(r.Context(), `
 			UPDATE assessment_attempts at SET results_released=TRUE,
 				final_score=(SELECT COALESCE(sum(awarded_points),0) FROM assessment_answers WHERE attempt_id=at.id),
-				final_max_score=(SELECT COALESCE(sum(ai.points),0) FROM assessment_items ai WHERE ai.assessment_id=(SELECT assessment_id FROM assessment_assignments WHERE id=at.assignment_id))
+				final_max_score=(SELECT COALESCE(sum(points),0) FROM assessment_attempt_items WHERE attempt_id=at.id)
 			WHERE at.id=$1 RETURNING results_released,final_score::float8,final_max_score::float8`, attemptID).Scan(&released, &finalScore, &finalMax)
 		if err != nil {
 			a.serverError(w, r, err)

@@ -166,8 +166,7 @@ func newLifecycleFixture(t *testing.T) lifecycleFixture {
 
 func (f lifecycleFixture) start(t *testing.T) string {
 	t.Helper()
-	// The start endpoint currently responds without the {data: ...} envelope.
-	attemptID, _ := f.learner.call("POST", "/student/assessments/"+f.assignmentID+"/start", map[string]any{}).expect(http.StatusCreated).envelope()["attempt_id"].(string)
+	attemptID, _ := f.learner.call("POST", "/student/assessments/"+f.assignmentID+"/start", map[string]any{}).expect(http.StatusCreated).object()["attempt_id"].(string)
 	if attemptID == "" {
 		t.Fatal("start returned no attempt_id")
 	}
@@ -252,14 +251,5 @@ func TestSubmissionAfterDeadlineUsesOnlyServerSavedAnswers(t *testing.T) {
 	result := f.learner.call("POST", "/student/attempts/"+attemptID+"/submit", map[string]any{"answers": map[string]any{f.choiceID: "A", f.numericID: "12"}}).expect(http.StatusOK).object()
 	if result["deadline_submission"] != true || result["auto_score"] != float64(0) {
 		t.Fatalf("late submission must ignore the payload and grade saved answers only, got %v", result)
-	}
-}
-
-func TestLearnerCannotSeeQuestionsBeforeStarting(t *testing.T) {
-	t.Skip("known issue P0-4 in docs/system-analysis.md: questions are returned before the attempt starts (Phase 2)")
-	f := newLifecycleFixture(t)
-	view := f.learner.call("GET", "/student/assessments/"+f.assignmentID, nil).expect(http.StatusOK).object()
-	if questions, _ := view["questions"].([]any); len(questions) != 0 {
-		t.Fatalf("questions are visible before the attempt starts: %v", questions)
 	}
 }

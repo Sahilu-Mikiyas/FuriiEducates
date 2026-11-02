@@ -139,3 +139,27 @@ footer span{color:#1d4ed8}
 .demo-status-label select{height:31px;padding:0 9px;border:1px solid #dce5df;border-radius:6px;background:#fff;color:#41544a;font:inherit}
 @media(max-width:620px){.demo-request-head{display:grid;gap:5px}.demo-status-label{align-items:flex-start;flex-direction:column}}
 .operations-page{display:grid;gap:18px;margin-top:18px}.operations-page .metrics{margin:0 0 2px}.operations-page .panel{margin:0}.operations-page .history-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.operations-page .span-all{grid-column:1/-1}.operations-page fieldset.phase-field{min-width:0;border:1px solid #e5e7eb;border-radius:12px;padding:14px;display:grid;gap:10px}.phase-field legend{font-weight:700}.operation-card{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:16px 0;border-top:1px solid #ececf0}.operation-card p{margin:7px 0;color:#5d6472;font-size:.9rem}.operation-actions{display:flex;gap:8px;flex-wrap:wrap}.resource-list{margin-top:12px}.resource-list .operation-card{align-items:center}.student-resources{margin:0 0 18px}.operations-page h3,.operations-page h4{margin:20px 0 10px}.operations-page .student-picker{display:grid;gap:8px;max-width:520px;margin:10px 0 22px}.operations-page .student-picker select{padding:12px;border:1px solid #d8dae0;border-radius:10px;background:white}.operations-page .stack-form label{display:grid;gap:7px}.operations-page .stack-form input,.operations-page .stack-form select,.operations-page .stack-form textarea{width:100%;min-width:0}.operations-page .panel-head p{max-width:720px}@media(max-width:720px){.operations-page .history-fields{grid-template-columns:1fr}.operations-page .span-all{grid-column:auto}.operation-card{flex-direction:column}.operation-actions{width:100%}.operation-actions button{flex:1}}
+
+/* Secure exams */
+.assessment-options{display:grid;gap:6px;margin:4px 0}
+.assessment-options label,.assign-check{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:400}
+.assessment-options input,.assign-check input{width:auto;margin:0}
+.assign-time{display:grid;gap:2px;font-size:12px}
+.start-code-form{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px}
+.start-code-form input{letter-spacing:.2em;font-weight:700;text-transform:uppercase;max-width:180px}
+.exam-lock-banner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;margin-bottom:12px;border-radius:10px;background:#fff4e5;color:#7a4300;border:1px solid #f3d19e}
+.session-console{display:grid;gap:14px;margin-top:14px}
+.session-summary{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px;align-items:center}
+.session-summary small{display:block}
+.session-code{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.start-code{font-size:30px;letter-spacing:.18em;font-weight:800}
+.session-actions{display:flex;flex-wrap:wrap;gap:6px}
+.session-action-form,.session-timeline{padding:14px;border:1px solid rgba(0,0,0,.1);border-radius:10px}
+.session-action-buttons{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.session-timeline ul{margin:10px 0 0;padding-left:18px;display:grid;gap:4px;font-size:13px}
+.session-timeline time{font-weight:600;margin-right:6px}
+.gradebook-panel td small,.session-console td small{display:block}
+.assessment-options strong{font-size:13px;font-weight:700}
+.assessment-question-list label{display:flex;align-items:flex-start;gap:10px;text-align:left}
+.assessment-question-list input[type=checkbox]{width:auto;height:auto;flex:none;margin-top:3px}
+.assessment-question-list label span{flex:1;min-width:0}
