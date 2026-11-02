@@ -31,7 +31,7 @@ paths:
   /me:
     get:
       summary: Get the current identity and roles
-      description: Includes platform_operator, which is true for school administrators listed in DEMO_REQUEST_ADMIN_EMAILS.
+      description: Includes platform_operator, which is true for school administrators listed in DEMO_REQUEST_ADMIN_EMAILS, and default_language, the school's default language.
       security: [{ sessionCookie: [] }]
       responses:
         '200': { description: Current user }

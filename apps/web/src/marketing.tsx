@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import './marketing.css'
-import { apiURL } from './api'
+import { apiURL } from './lib/api'
 
 const views = [
   {

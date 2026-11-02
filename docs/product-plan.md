@@ -11,7 +11,7 @@ Written 2026-11-01. Companion to [system-analysis.md](system-analysis.md), which
 | Area | Working today | Gaps |
 |---|---|---|
 | Onboarding | Landing-page setup request, operator prepares school and admin invite | No email delivery; links copied by hand |
-| School setup | School profile, academic years, classes | No terms, no Ethiopian calendar, no editing or archiving |
+| School setup | School profile, academic years, classes | No terms, no editing or archiving |
 | Students | Create students, enroll at creation, learner invites | No guardians, no documents, no transfers, no search, 200-row limit |
 | Academic history | Prior school results, external exams, CSV import | No verification workflow, no edit or delete |
 | Curriculum | Curricula, subjects, skill trees | Shared across schools (security bug P0-1) |
@@ -29,13 +29,11 @@ Written 2026-11-01. Companion to [system-analysis.md](system-analysis.md), which
 - **Phase 1, security and tenancy** (2026-11-01, pushed to main): school-private curricula, first-party login cookie, password change and reset links, rate limits.
 - **Phase 2, exam correctness and secure exams v1** (2026-11-02): hidden questions until start, server-side finalizing, due dates, gradebook, admin grading, shuffling, start codes, invigilator console, locked mode.
 
-### Foundation work still required before real schools
+- **Phase 3, frontend restructure** (2026-11-02): routed pages, shared data layer, English and first-draft Amharic, Ethiopian calendar shown alongside Gregorian. Afaan Oromo, Tigrinya and a native review of the Amharic are still open (decision 4 in section 5).
 
-These come from the system analysis and are non-negotiable before real student data:
+### Foundation work
 
-1. **Phase 3, frontend restructure:** split the single large screen file into routed pages. Every module below depends on this.
-
-Phases 1 and 2, listed under Completed so far, were the other two requirements.
+Phases 1, 2 and 3, listed under Completed so far, were the foundation work required before real student data. A native speaker's review of the Amharic should happen before a school uses it.
 
 ---
 

@@ -6,7 +6,7 @@ School-scoped, assessment-first school platform. The first pilot can start with 
 
 - `services/api`: Go HTTP API and domain packages
 - `services/api/migrations`: PostgreSQL schema migrations (Goose)
-- `apps/web`: React, Vite, and TypeScript application
+- `apps/web`: React, Vite, and TypeScript application. Routed screens are in `src/pages`, shared features in `src/features`, translations in `src/i18n` (`en.ts` is the source), and the Ethiopian calendar in `src/calendar`
 - `api-spec/openapi.yaml`: REST API contract
 - `docs`: architecture and operational decisions
 - `compose.yaml`: local PostgreSQL service
@@ -18,7 +18,7 @@ Requirements: Go 1.27.3+ (any Go 1.21+ downloads it automatically; older patch r
 1. Copy `.env.example` to `.env` as a reference and set a long random `SESSION_HASH_KEY` (at least 32 bytes). Export its values in the shell running the Go commands; the API does not load dotenv files.
 2. Start PostgreSQL with `docker compose up -d db`.
 3. Start the API from `services/api`: `go run ./cmd/api`. The API applies any pending migrations in `services/api/migrations` before it starts serving, under an advisory lock, and refuses to start if a migration fails.
-4. Start the web application from `apps/web`: `npm ci` then `npm run dev`.
+4. Start the web application from `apps/web`: `npm ci` then `npm run dev`. Run its tests with `npm test`.
 
 ## Tests
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api } from './api'
+import { api } from '../../lib/api'
 
 type IntegritySignal = 'tab_hidden' | 'window_blur' | 'fullscreen_exit' | 'paste_attempt' | 'copy_attempt'
 

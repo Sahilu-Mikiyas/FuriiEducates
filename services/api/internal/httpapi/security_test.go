@@ -223,6 +223,13 @@ func TestPlatformOperatorFlagAndAdminRecovery(t *testing.T) {
 	lockedOut.call("GET", "/platform/demo-requests", nil).expect(http.StatusForbidden)
 	lockedOut.call("POST", "/platform/password-resets", map[string]string{"email": operatorEmail}).expect(http.StatusForbidden)
 
+	// The web app starts in the school's default language.
+	school := operator.call("GET", "/school", nil).expect(http.StatusOK).object()
+	operator.call("PATCH", "/school", map[string]any{"name": school["name"], "timezone": school["timezone"], "default_language": "am"}).expect(http.StatusOK)
+	if language := operator.call("GET", "/me", nil).expect(http.StatusOK).object()["default_language"]; language != "am" {
+		t.Fatalf("identity should carry the school's default language, got %v", language)
+	}
+
 	operator.call("POST", "/platform/password-resets", map[string]string{"email": "missing@example.test"}).expect(http.StatusNotFound)
 	token, _ := operator.call("POST", "/platform/password-resets", map[string]string{"email": lockedOutEmail}).expect(http.StatusCreated).object()["token"].(string)
 	newClient(t, server).call("POST", "/auth/password-reset/complete", map[string]string{"token": token, "new_password": "recovered-admin-password"}).expect(http.StatusOK)

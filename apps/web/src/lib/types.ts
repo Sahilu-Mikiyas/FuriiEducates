@@ -1,0 +1,48 @@
+// Shapes of the API's responses, matching api-spec/openapi.yaml.
+
+export type Identity = { user_id: string; school_id: string; display_name: string; roles: string[]; platform_operator?: boolean; default_language?: string }
+export type DemoRequest = { id: string; name: string; email: string; school_name: string; role: string; school_size: string; timezone: string; region: string; default_language: string; priorities: string[]; prepared_school_id: string; message: string; status: 'new' | 'contacted' | 'closed'; created_at: string; updated_at: string }
+export type SchoolSetupProfile = { learner_count_band: string; region: string; priorities: string[] }
+export type School = { id: string; name: string; timezone: string; default_language: string }
+export type Year = { id: string; name: string; starts_on: string; ends_on: string }
+export type ClassRoom = { id: string; name: string; grade_level: string; academic_year_id: string; academic_year_name?: string }
+export type Student = { id: string; student_number: string; legal_name: string; preferred_language: string; status: string; has_account: boolean }
+export type AcademicRecord = { id: string; school_name: string; academic_year_label: string; grade_level: string; subject_name: string; score: number | null; maximum_score: number | null; grade_label: string; grading_scale_name: string; source_type: string; verification_status: string }
+export type ExternalExam = { id: string; exam_name: string; exam_provider: string; exam_date: string; subject_or_section: string; score: number | null; maximum_score: number | null; score_label: string; verification_status: string; breakdowns: { section_name: string; score: number | null; maximum_score: number | null }[] }
+export type ImportPreview = { id: string; status: string; row_count: number; valid_rows: number; error_rows: number; can_commit: boolean; row_errors: { row: number; errors: string[] }[] }
+export type Curriculum = { id: string; name: string; provider: string; country_code: string; version_label: string; language_code: string; source_reference: string; license_notes: string }
+export type Subject = { id: string; name: string; grade_level: string; subject_code: string }
+export type CurriculumNode = { id: string; parent_id: string; node_type: string; code: string; title: string; description: string; sort_order: number }
+export type Question = { id: string; question_type: string; prompt: { text?: string }; options: { id: string; text: string }[] | null; explanation: { text?: string } | null; difficulty: number | null; language_code: string; source_name: string; source_reference: string; license_notes: string; status: string; skill_tags: { skill_id: string; title: string; weight: number }[] }
+export type StaffMember = { id: string; email: string; display_name: string; status: string; class_ids: string[] }
+export type StaffInvitation = { id: string; email: string; role: string; created_at: string; expires_at: string }
+export type TeacherStudent = { id: string; student_number: string; legal_name: string; preferred_language: string; status: string }
+export type Assessment = { id: string; title: string; instructions: string; status: string; created_at: string; duration_minutes: number; shuffle_questions: boolean; shuffle_options: boolean; locked_mode: boolean; question_count: number; question_ids: string[]; assigned_class_ids: string[] }
+export type LearningSummary = { assigned_assessments: number; submitted_attempts: number; average_score_percent: number; active_recommendations: number }
+
+export type LearnerAssignment = { assignment_id: string; title: string; instructions: string; class_name: string; grade_level: string; assigned_at: string; due_at: string; attempt_status: string; attempt_id: string }
+export type LearnerQuestion = { id: string; question_type: string; prompt: { text?: string }; options?: { id: string; text: string }[]; points: string; answer?: unknown; revision: number; flagged: boolean; awarded_points?: string; feedback?: string }
+export type LearnerAssessment = { assignment_id: string; title: string; instructions: string; status: string; attempt_id: string; deadline_at: string | null; score: number | null; max_score: number | null; results_released: boolean; final_score: number | null; final_max_score: number | null; manual_review_count: number; question_count: number; duration_minutes: number; requires_start_code: boolean; session_open: boolean; locked_mode: boolean; opens_at: string | null; due_at: string | null; not_open_yet: boolean; past_due: boolean; questions: LearnerQuestion[] }
+export type StudentLearningProfile = {
+  algorithm_version: string
+  skills: { skill_id: string; title: string; estimated_mastery: number; confidence: number; evidence_count: number; confidence_band: string }[]
+  recommendations: { id: string; skill_id: string; skill_title: string; reason_code: string; evidence_summary: { estimated_mastery?: number; evidence_count?: number; confidence?: number }; recommended_action: { title?: string; description?: string; target_mastery?: number }; priority: string; status: string; pre_mastery: number | null; post_mastery: number | null; change_points: number | null }[]
+}
+
+export type TeacherReview = { attempt_id: string; question_id: string; assignment_id?: string; assessment_title: string; student_id?: string; student_number: string; student_name: string; prompt: { text?: string }; grading_guide?: unknown; answer: unknown; max_points: number; feedback: string; reviewed_at?: string }
+export type TeacherLearningRow = { student_id: string; student_number: string; student_name: string; skill_id: string; skill_title: string; estimated_mastery: number; confidence: number; evidence_count: number; confidence_band: string; active_recommendations: number }
+
+export type FinanceEntry = { id: string; entry_type: string; category: string; description: string; amount_minor: number; currency_code: string; student_name: string; staff_name: string; due_on?: string; paid_on?: string; status: string; reference: string; created_at: string }
+export type FinanceSummary = { tuition_billed_minor: number; payments_recorded_minor: number; expenses_recorded_minor: number; salaries_recorded_minor: number; outstanding_charges_minor: number }
+export type LessonPlan = { id: string; teacher_name?: string; class_name?: string; grade_level?: string; class_id: string; subject: string; lesson_date: string; duration_minutes: number; topic: string; objectives: string; prior_knowledge: string; materials: string; lesson_phases: { phase: string; minutes: number; activities: string }[]; differentiation: string; assessment: string; homework: string; reflection: string; status: string }
+export type Resource = { id: string; class_id: string; title: string; description: string; subject: string; file_name: string; media_type: string; file_size: number; created_at: string }
+
+export type SessionSummary = { assignment_id: string; title: string; class_name: string; grade_level: string; duration_minutes: number; locked_mode: boolean; requires_start_code: boolean; session_open: boolean; opens_at: string | null; due_at: string | null; enrolled: number; in_progress: number; submitted: number }
+export type RosterRow = { student_id: string; student_number: string; student_name: string; attempt_id: string; status: string; deadline_at: string | null; submitted_at: string | null; answered: number; last_saved_at: string | null; integrity_flags: number; incidents: number }
+export type SessionDetail = { assignment_id: string; title: string; duration_minutes: number; question_count: number; locked_mode: boolean; requires_start_code: boolean; session_open: boolean; start_code: string | null; roster: RosterRow[] }
+export type TimelineEvent = { event_type: string; event_data: Record<string, unknown>; occurred_at: string }
+export type GradebookCell = { status: string; score: number | null; max_score: number | null; final_score: number | null; final_max_score: number | null; results_released: boolean; pending_review: number }
+export type GradebookData = { assignments: { assignment_id: string; title: string; max_points: number; due_at: string | null }[]; students: { student_id: string; student_number: string; student_name: string; results: Record<string, GradebookCell> }[] }
+
+export type ClassOption = { id: string; name: string; grade_level: string }
+export const classLabel = (classroom: ClassOption) => `${classroom.grade_level} · ${classroom.name}`

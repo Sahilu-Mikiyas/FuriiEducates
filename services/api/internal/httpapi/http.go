@@ -257,13 +257,18 @@ func (a *API) me(w http.ResponseWriter, r *http.Request) {
 }
 
 // identityResponse is the signed-in user as returned by login and /me,
-// including whether they may use platform operator pages.
+// including whether they may use platform operator pages and the school's
+// default language, which the web app starts in.
 func (a *API) identityResponse(ctx context.Context, identity auth.Identity) (map[string]any, error) {
 	operator, err := a.isPlatformOperator(ctx, identity)
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"user_id": identity.UserID, "school_id": identity.SchoolID, "display_name": identity.DisplayName, "roles": identity.Roles, "platform_operator": operator}, nil
+	var language string
+	if err := a.db.QueryRow(ctx, `SELECT default_language FROM schools WHERE id=$1`, identity.SchoolID).Scan(&language); err != nil {
+		return nil, err
+	}
+	return map[string]any{"user_id": identity.UserID, "school_id": identity.SchoolID, "display_name": identity.DisplayName, "roles": identity.Roles, "platform_operator": operator, "default_language": language}, nil
 }
 
 // isPlatformOperator reports whether a school administrator's email is listed

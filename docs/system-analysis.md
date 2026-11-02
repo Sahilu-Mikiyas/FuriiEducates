@@ -44,7 +44,19 @@ Next: Phase 2 (exam correctness), merged with secure exams v1 per docs/product-p
 
 Not yet done from Module B: exam blueprints that draw from the bank by topic and difficulty, item analysis, moderation before release, an on-site exam server, and locked-down native apps.
 
-Next: Phase 3 (frontend restructure), with languages and the Ethiopian calendar.
+**2026-11-02 — Phase 3 (frontend restructure, languages, Ethiopian calendar) completed.**
+
+- `apps/web/src/main.tsx` went from 90 KB to a small entry file. Every screen is now its own routed page under `src/pages`, shared features are under `src/features`, and each workspace downloads only when opened. Administrators use `/admin/*`, teachers `/teach/*`, and learners `/learn/*`.
+- React Router handles navigation and TanStack Query handles shared data (`src/lib/queries.ts`), so `App` no longer loads every record at sign-in. An expired session now returns to the sign-in page, and signing out clears all cached records, which matters on shared lab computers.
+- A user who is both administrator and teacher can now reach both workspaces.
+- The app has English and Amharic throughout, except as noted below. The choice is saved per device, and otherwise follows the school's default language (`default_language` on `/me`), then the browser. The Amharic text is a first draft and needs a native speaker's review before schools rely on it.
+- Dates show the Ethiopian and Gregorian calendars together, with a per-device choice to show one. Date fields accept either calendar and always send Gregorian dates to the API. Conversion is tested against known dates and every day across 400 years.
+- Browser testing found and fixed: text as small as 8px, which is unreadable in Ge'ez script (nothing is below 11px now); a sign-out button pushed below the visible sidebar and missing on phones; unstyled exam status and question buttons; phone sidebars that covered the screen.
+- New web tests run in CI (`npm test`): calendar conversion, and Amharic matching English keys and placeholders.
+
+Not yet done: Afaan Oromo and Tigrinya (need translators); the public landing page is English only; field validation messages from the API stay in English; the Ethiopian clock (hours counted from 6 a.m.) and national holidays; generating API types from OpenAPI (types in `src/lib/types.ts` are hand-written); moving the exam console, gradebook and grading queue onto the shared data layer; component-level web tests.
+
+Next: national exam prep v1 per docs/product-plan.md.
 
 ---
 

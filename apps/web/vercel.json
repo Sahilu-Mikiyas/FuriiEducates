@@ -9,6 +9,14 @@
       "destination": "/"
     },
     {
+      "source": "/teach/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/learn/:path*",
+      "destination": "/"
+    },
+    {
       "source": "/login",
       "destination": "/"
     }

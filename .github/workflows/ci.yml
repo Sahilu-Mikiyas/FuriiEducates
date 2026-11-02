@@ -140,4 +140,4 @@ jobs:
           if ! echo "$question_bank" | jq -e --arg id "$question_id" 'any(.data[]; .id == $id and .status == "published" and (has("answer_key") | not) and .skill_tags[0].title == "Add fractions")'; then echo "::error title=FURII smoke test::Published question is missing or answer key was exposed: $question_bank"; exit 1; fi
       - name: Build web application
         working-directory: apps/web
-        run: npm ci && npm audit --omit=dev --audit-level=high && npm run build
+        run: npm ci && npm audit --omit=dev --audit-level=high && npm test && npm run build
