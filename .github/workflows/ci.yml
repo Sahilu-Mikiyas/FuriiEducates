@@ -60,7 +60,12 @@ jobs:
         working-directory: services/api
         env:
           TEST_DATABASE_URL: postgres://furii:furii-ci-password@localhost:5432/furii?sslmode=disable
-        run: go test -count=1 ./...
+        run: |
+          set -o pipefail
+          if ! go test -count=1 ./... 2>&1 | tee "$RUNNER_TEMP/go-test.log"; then
+            grep -E '^(--- FAIL|panic:)|^ +--- FAIL|_test\.go:[0-9]+:|^(connect to|prepare role|create test database|open test database|parse TEST|migrate test)' "$RUNNER_TEMP/go-test.log" | head -20 | cut -c1-500 | while IFS= read -r line; do echo "::error title=API test::$line"; done
+            exit 1
+          fi
       - name: Prepare Supabase roles for migrations
         env:
           POSTGRES_DB: furii
