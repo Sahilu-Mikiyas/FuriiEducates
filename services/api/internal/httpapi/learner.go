@@ -253,6 +253,7 @@ type studentAssignmentView struct {
 	SessionOpen       bool
 	StartCode         *string
 	LockedMode        bool
+	NationalPaper     *string
 	OpensAt           *string
 	DueAt             *string
 	NotOpenYet        bool
@@ -276,7 +277,7 @@ func (a *API) studentAssignment(w http.ResponseWriter, r *http.Request, id auth.
 	err = a.db.QueryRow(r.Context(), `
 		SELECT a.title,a.instructions,a.duration_minutes,
 		       (SELECT count(*)::int FROM assessment_items ai WHERE ai.assessment_id=a.id),
-		       aa.requires_start_code,aa.session_open,aa.start_code,a.locked_mode,
+		       aa.requires_start_code,aa.session_open,aa.start_code,a.locked_mode,a.national_paper,
 		       to_char(aa.opens_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'),
 		       to_char(aa.due_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'),
 		       COALESCE(aa.opens_at>now(),FALSE),COALESCE(aa.due_at<=now(),FALSE)
@@ -284,7 +285,7 @@ func (a *API) studentAssignment(w http.ResponseWriter, r *http.Request, id auth.
 		JOIN assessments a ON a.id=aa.assessment_id AND a.school_id=aa.school_id
 		JOIN enrollments e ON e.class_id=aa.class_id AND e.school_id=aa.school_id AND e.student_id=$3 AND e.status='active'
 		WHERE aa.id=$1 AND aa.school_id=$2 AND a.status='published'`, r.PathValue("assignmentID"), id.SchoolID, studentID).Scan(
-		&view.Title, &view.Instructions, &view.DurationMinutes, &view.QuestionCount, &view.RequiresStartCode, &view.SessionOpen, &view.StartCode, &view.LockedMode, &view.OpensAt, &view.DueAt, &view.NotOpenYet, &view.PastDue)
+		&view.Title, &view.Instructions, &view.DurationMinutes, &view.QuestionCount, &view.RequiresStartCode, &view.SessionOpen, &view.StartCode, &view.LockedMode, &view.NationalPaper, &view.OpensAt, &view.DueAt, &view.NotOpenYet, &view.PastDue)
 	if errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, 404, "NOT_FOUND", "This assessment is not assigned to your active class.", nil)
 		return view, false
@@ -386,7 +387,7 @@ func (a *API) getStudentAssessment(w http.ResponseWriter, r *http.Request, id au
 		"deadline_at": deadlineAt, "score": score, "max_score": maxScore, "results_released": resultsReleased,
 		"final_score": finalScore, "final_max_score": finalMax, "manual_review_count": manualReview, "questions": questions,
 		"question_count": view.QuestionCount, "duration_minutes": view.DurationMinutes, "requires_start_code": view.RequiresStartCode,
-		"session_open": view.SessionOpen, "locked_mode": view.LockedMode, "opens_at": view.OpensAt, "due_at": view.DueAt,
+		"session_open": view.SessionOpen, "locked_mode": view.LockedMode, "national_paper": view.NationalPaper, "opens_at": view.OpensAt, "due_at": view.DueAt,
 		"not_open_yet": view.NotOpenYet, "past_due": view.PastDue,
 	}})
 }

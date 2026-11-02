@@ -16,6 +16,8 @@ const teacherPages: { path: string; label: MessageKey }[] = [
   { path: 'gradebook', label: 'teacher.nav.gradebook' },
   { path: 'written-answers', label: 'teacher.nav.answers' },
   { path: 'planning', label: 'teacher.nav.planning' },
+  { path: 'exam-prep', label: 'teacher.nav.examPrep' },
+  { path: 'exam-questions', label: 'teacher.nav.examQuestions' },
   { path: 'account', label: 'teacher.nav.account' },
 ]
 

@@ -36,6 +36,13 @@ func updateLearningIntelligence(ctx context.Context, tx pgx.Tx, schoolID, attemp
 	if err := tx.QueryRow(ctx, `SELECT student_id::text FROM assessment_attempts WHERE id=$1 AND school_id=$2`, attemptID, schoolID).Scan(&studentID); err != nil {
 		return err
 	}
+	return recalculateMastery(ctx, tx, schoolID, studentID, attemptID)
+}
+
+// recalculateMastery updates a student's skill estimates and recommendations
+// from all their evidence. attemptID names the exam attempt behind the update,
+// which measures completed recommendations; practice passes "".
+func recalculateMastery(ctx context.Context, tx pgx.Tx, schoolID, studentID, attemptID string) error {
 	rows, err := tx.Query(ctx, `
 		SELECT e.skill_id::text,n.title,count(*)::int,sum(e.evidence_weight)::float8,
 		       sum(e.correctness*e.evidence_weight)::float8
@@ -88,6 +95,9 @@ func updateLearningIntelligence(ctx context.Context, tx pgx.Tx, schoolID, attemp
 			}
 		} else if _, err = tx.Exec(ctx, `UPDATE recommendations SET status='superseded' WHERE school_id=$1 AND student_id=$2 AND skill_id=$3 AND status IN ('pending','accepted','in_progress')`, schoolID, studentID, item.skillID); err != nil {
 			return err
+		}
+		if attemptID == "" {
+			continue
 		}
 		_, err = tx.Exec(ctx, `INSERT INTO intervention_outcomes(school_id,recommendation_id,post_attempt_id,pre_mastery,post_mastery,change_points,outcome_summary)
 			SELECT r.school_id,r.id,$3,r.baseline_mastery,$4,$4-r.baseline_mastery,

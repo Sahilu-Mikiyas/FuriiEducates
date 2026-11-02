@@ -26,11 +26,14 @@ const ResultsPage = lazy(() => import('../pages/admin/ResultsPage'))
 const StaffPage = lazy(() => import('../pages/admin/StaffPage'))
 const SetupRequestsPage = lazy(() => import('../pages/admin/SetupRequestsPage'))
 const SettingsPage = lazy(() => import('../pages/admin/SettingsPage'))
+const ExamPrepPage = lazy(() => import('../pages/admin/ExamPrepPage'))
+const QuestionBankPage = lazy(() => import('../features/prep/QuestionBank').then((m) => ({ default: m.QuestionBank })))
 const TeacherLayout = lazy(() => import('../pages/teacher/TeacherLayout'))
 const ClassPage = lazy(() => import('../pages/teacher/ClassPage'))
-const teacherPage = (name: 'TeacherSessionsPage' | 'TeacherGradebookPage' | 'TeacherAnswersPage' | 'TeacherPlanningPage' | 'TeacherAccountPage') =>
+const teacherPage = (name: 'TeacherReadinessPage' | 'TeacherSessionsPage' | 'TeacherGradebookPage' | 'TeacherAnswersPage' | 'TeacherPlanningPage' | 'TeacherAccountPage') =>
   lazy(() => import('../pages/teacher/pages').then((m) => ({ default: m[name] })))
 const TeacherSessionsPage = teacherPage('TeacherSessionsPage')
+const TeacherReadinessPage = teacherPage('TeacherReadinessPage')
 const TeacherGradebookPage = teacherPage('TeacherGradebookPage')
 const TeacherAnswersPage = teacherPage('TeacherAnswersPage')
 const TeacherPlanningPage = teacherPage('TeacherPlanningPage')
@@ -40,6 +43,9 @@ const LearnerLayout = lazy(() => learnerWorkspace().then((m) => ({ default: m.Le
 const LearnerHome = lazy(() => learnerWorkspace().then((m) => ({ default: m.LearnerHome })))
 const ExamRoute = lazy(() => learnerWorkspace().then((m) => ({ default: m.ExamRoute })))
 const LearnerAccountPage = lazy(() => learnerWorkspace().then((m) => ({ default: m.LearnerAccountPage })))
+const PrepHome = lazy(() => learnerWorkspace().then((m) => ({ default: m.PrepHome })))
+const PrepSessionRoute = lazy(() => learnerWorkspace().then((m) => ({ default: m.PrepSessionRoute })))
+const ComputerSkills = lazy(() => learnerWorkspace().then((m) => ({ default: m.ComputerSkills })))
 
 // RequireRole shows `render` to a signed-in user with the role, sends anyone
 // else to sign in, and sends other roles to their own workspace.
@@ -96,6 +102,8 @@ export function App() {
         <Route path="academic-passport" element={<AcademicHistoryPage />} />
         <Route path="curriculum" element={<CurriculumPage />} />
         <Route path="assessments" element={<AssessmentsPage />} />
+        <Route path="exam-prep" element={<ExamPrepPage />} />
+        <Route path="exam-questions" element={<QuestionBankPage />} />
         <Route path="exam-sessions" element={<ExamSessions />} />
         <Route path="results" element={<ResultsPage />} />
         <Route path="finance" element={<FinanceWorkspace />} />
@@ -112,6 +120,8 @@ export function App() {
         <Route path="gradebook" element={<TeacherGradebookPage />} />
         <Route path="written-answers" element={<TeacherAnswersPage />} />
         <Route path="planning" element={<TeacherPlanningPage />} />
+        <Route path="exam-prep" element={<TeacherReadinessPage />} />
+        <Route path="exam-questions" element={<QuestionBankPage />} />
         <Route path="account" element={<TeacherAccountPage />} />
         <Route path="*" element={<Navigate to="/teach/class" replace />} />
       </Route>
@@ -119,6 +129,9 @@ export function App() {
         <Route index element={<LearnerHome />} />
         <Route path="assessments/:assignmentID" element={<ExamRoute />} />
         <Route path="account" element={<LearnerAccountPage />} />
+        <Route path="prep" element={<PrepHome />} />
+        <Route path="prep/computer-skills" element={<ComputerSkills />} />
+        <Route path="prep/session/:sessionID" element={<PrepSessionRoute />} />
         <Route path="*" element={<Navigate to="/learn" replace />} />
       </Route>
       <Route path="*" element={<HomeRedirect />} />

@@ -31,6 +31,8 @@ Written 2026-11-01. Companion to [system-analysis.md](system-analysis.md), which
 
 - **Phase 3, frontend restructure** (2026-11-02): routed pages, shared data layer, English and first-draft Amharic, Ethiopian calendar shown alongside Gregorian. Afaan Oromo, Tigrinya and a native review of the Amharic are still open (decision 4 in section 5).
 
+- **National exam prep v1, first slice** (2026-11-02): question bank with approval and CSV import, drills, weak-topic and review practice, exam-format simulator, computer-skills lessons, full mocks out of 600, school mock papers, readiness for students, teachers and leaders. No real questions yet (decision 1 in section 5). Offline download, mock-day scheduling, trends, parent view and notifications are next.
+
 ### Foundation work
 
 Phases 1, 2 and 3, listed under Completed so far, were the foundation work required before real student data. A native speaker's review of the Amharic should happen before a school uses it.

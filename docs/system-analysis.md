@@ -56,7 +56,19 @@ Not yet done from Module B: exam blueprints that draw from the bank by topic and
 
 Not yet done: Afaan Oromo and Tigrinya (need translators); the public landing page is English only; field validation messages from the API stay in English; the Ethiopian clock (hours counted from 6 a.m.) and national holidays; generating API types from OpenAPI (types in `src/lib/types.ts` are hand-written); moving the exam console, gradebook and grading queue onto the shared data layer; component-level web tests.
 
-Next: national exam prep v1 per docs/product-plan.md.
+**2026-11-02 — National exam prep v1, first slice, built.**
+
+- Question bank: teachers write four-option questions by paper, grade and topic with a simple form or a CSV import. An administrator approves them before students see them. Teachers see answers only for questions they wrote. Exam-only questions stay out of practice so school mocks can use unseen questions.
+- Practice: drills with instant explanations, weak-topic practice driven by skill mastery, review of wrong answers after a day, and timed papers that show nothing until they finish. Timed answers save on the device first and sync. Expired papers and abandoned practice are closed by the existing minute job.
+- Simulator: a full-window exam screen with one question at a time, a clock, a navigator, flagging and a submit screen listing what is unanswered. School mock papers open in it too.
+- Computer-skills lessons: six guided lessons on the mouse, scrolling, answering, moving, flagging and the clock, using sample questions. Teachers can see who finished.
+- Full mocks: six timed papers for the student's stream, scored out of 600. School mock papers are drafted from the bank and run on the secure exam engine.
+- Readiness: per-paper estimates with a range, a total out of 600 withheld until all six papers have 15 answers, distance from the 300 line, weak topics, a class table and heatmap, and a school view by stream and class. Estimates describe work on the school's own questions and are labelled as not predicting official results.
+- Migration 00016 adds the tables. Practice now feeds skill evidence at half the weight of timed work. New tests cover approval, answer secrecy, grading, expiry, tenancy, mocks and readiness. The student and teacher flows were exercised in a browser with local test questions only. The administrator approval buttons, CSV upload screen and mock paper form were covered by API tests but not clicked through.
+
+Not yet done: downloading practice for offline use and installing as an app, school-wide mock-day scheduling across classes, trend across mock rounds, parent view, SMS or Telegram notices, Afaan Oromo and Tigrinya, and an AI tutor. There are no real exam questions yet: that needs decision 1 in docs/product-plan.md. The 120-minute default for a timed paper is our assumption and should be checked against the official timetable.
+
+Next: real question content, then offline practice and school mock days.
 
 ---
 

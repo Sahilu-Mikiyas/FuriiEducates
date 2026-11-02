@@ -49,10 +49,16 @@ func StartAttemptFinalizer(ctx context.Context, db *pgxpool.Pool, log *slog.Logg
 				if ctx.Err() == nil {
 					log.Error("finalizing expired attempts failed", "error", err)
 				}
-				return
-			}
-			if count > 0 {
+			} else if count > 0 {
 				log.Info("finalized expired attempts", "attempts", count)
+			}
+			practice, err := finalizeExpiredPrepSessions(ctx, db)
+			if err != nil {
+				if ctx.Err() == nil {
+					log.Error("closing expired practice failed", "error", err)
+				}
+			} else if practice > 0 {
+				log.Info("closed expired practice", "sessions", practice)
 			}
 		}
 		run()

@@ -3,6 +3,8 @@ import { useParams } from 'react-router'
 import { useDates } from '../../calendar/useDates'
 import { requestExamFullscreen, useExamLock } from '../../features/exams/exam-lock'
 import { clearPendingAnswers, listPendingAnswers, removePendingAnswer, savePendingAnswer } from '../../features/exams/offlineAnswers'
+import { usePaperName } from '../../features/prep/readiness'
+import { Simulator } from '../../features/prep/Simulator'
 import { MessageKey, useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { useRefresh } from '../../lib/queries'
@@ -28,6 +30,7 @@ export default function ExamRoute() {
 // so a lost connection or a closed tab cannot lose work.
 function ExamPage({ assignmentID }: { assignmentID: string }) {
   const { t, errorText } = useI18n()
+  const paperName = usePaperName()
   const refresh = useRefresh()
   const [assessment, setAssessment] = useState<LearnerAssessment | null>(null)
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({})
@@ -199,7 +202,24 @@ function ExamPage({ assignmentID }: { assignmentID: string }) {
     <h1>{assessment.title}</h1>
     {assessment.instructions && <p className="learner-instructions">{assessment.instructions}</p>}
     {assessment.status === 'not_started' && <StartPanel assessment={assessment} busy={busy} onStart={(code) => void start(code)} />}
-    {assessment.status === 'in_progress' && <form className="learner-question-form" onSubmit={(e: FormEvent<HTMLFormElement>) => { e.preventDefault(); void submitAnswers() }}>
+    {assessment.status === 'in_progress' && assessment.national_paper && <Simulator
+      title={`${paperName(assessment.national_paper)} · ${assessment.title}`}
+      questions={assessment.questions.map((q) => ({ id: q.id, prompt: q.prompt?.text || t('questions.promptFallback'), options: q.options ?? [] }))}
+      answers={Object.fromEntries(Object.entries(answers).map(([id, value]) => [id, typeof value === 'string' && value ? value : undefined]))}
+      flags={flags}
+      secondsLeft={secondsLeft}
+      status={online ? t('exam.connected', { state: t(syncLabels[syncState]) }) : t('exam.disconnected', { state: t(syncLabels[syncState]) })}
+      busy={busy || !online}
+      submitLabel={t('exam.submit')}
+      notice={<>
+        {error && <p className="form-error sim-error" role="alert">{error}</p>}
+        {examLock.needsFullscreen && <div className="exam-lock-banner sim-notice" role="alert"><span>{t('exam.lockNotice')}</span><button type="button" className="primary compact" onClick={() => requestExamFullscreen()}>{t('exam.returnFullscreen')}</button></div>}
+      </>}
+      onAnswer={(id, option) => setAnswer(id, option)}
+      onToggleFlag={(id) => setAnswer(id, answers[id] ?? null, !(flags[id] ?? false))}
+      onSubmit={() => void submitAnswers()}
+    />}
+    {assessment.status === 'in_progress' && !assessment.national_paper && <form className="learner-question-form" onSubmit={(e: FormEvent<HTMLFormElement>) => { e.preventDefault(); void submitAnswers() }}>
       {examLock.needsFullscreen && <div className="exam-lock-banner" role="alert">
         <span>{t('exam.lockNotice')}</span>
         <button type="button" className="primary compact" onClick={() => requestExamFullscreen()}>{t('exam.returnFullscreen')}</button>

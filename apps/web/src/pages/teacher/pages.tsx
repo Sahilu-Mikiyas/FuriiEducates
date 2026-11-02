@@ -3,8 +3,14 @@ import { ExamSessions } from '../../features/exams/ExamSessions'
 import { Gradebook } from '../../features/exams/Gradebook'
 import { GradingQueue } from '../../features/exams/GradingQueue'
 import { TeacherPlanning } from '../../features/operations/LessonPlans'
+import { ClassReadiness } from '../../features/prep/ClassReadiness'
 import { useI18n } from '../../i18n'
 import { useTeacherContext } from './TeacherLayout'
+
+export function TeacherReadinessPage() {
+  const { classID } = useTeacherContext()
+  return classID ? <ClassReadiness key={classID} classID={classID} /> : null
+}
 
 export function TeacherSessionsPage() {
   return <ExamSessions />

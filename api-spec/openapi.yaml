@@ -36,6 +36,138 @@ paths:
       responses:
         '200': { description: Current user }
         '401': { description: Authentication required }
+  /prep/bank:
+    get:
+      summary: Count each national exam paper's questions (staff)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /prep/questions:
+    get:
+      summary: List exam questions. Teachers see answers only for questions they wrote (staff)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    post:
+      summary: Save a four-option exam question as a draft (staff)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /prep/questions/import:
+    post:
+      summary: Import a CSV of exam questions as drafts. Any bad row saves nothing and returns row_errors (staff)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /prep/questions/approve:
+    post:
+      summary: Approve draft exam questions (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /prep/questions/{questionID}/reject:
+    post:
+      summary: Reject a draft exam question (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /prep/mock-papers:
+    post:
+      summary: Draft a school mock paper from approved questions, using exam-only questions first (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /prep/students/{studentID}/stream:
+    put:
+      summary: Set a student's natural or social science stream (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /prep/classes/{classID}/stream:
+    put:
+      summary: Set the stream of every student in a class (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /prep/classes/{classID}/readiness:
+    get:
+      summary: Class readiness estimates and topic results (administrator or assigned teacher)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /prep/readiness:
+    get:
+      summary: School readiness by stream and class (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /student/prep:
+    get:
+      summary: The student's exam prep home: stream, papers, readiness, open practice and mocks
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /student/prep/onboarding:
+    post:
+      summary: Record that the student finished the computer-skills lessons
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /student/prep/sessions:
+    post:
+      summary: Start a drill, weak-topic, review or timed practice sitting
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /student/prep/sessions/{sessionID}:
+    get:
+      summary: Read a sitting. Answers appear after each answer in practice and only after finishing on a timed paper
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /student/prep/sessions/{sessionID}/answers/{questionID}:
+    put:
+      summary: Save an answer and flag. Practice replies with the explanation; the first practice answer stands
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /student/prep/sessions/{sessionID}/finish:
+    post:
+      summary: Finish and grade a sitting
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /student/prep/mocks:
+    post:
+      summary: Open a full mock exam for the student's stream, or return the one already open
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /student/prep/mocks/{mockID}/papers:
+    post:
+      summary: Start or resume one timed paper of a full mock exam
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
   /demo-requests:
     post:
       summary: Submit a public school setup request

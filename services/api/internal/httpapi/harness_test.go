@@ -148,6 +148,9 @@ func newClient(t *testing.T, server *httptest.Server) *apiClient {
 	return &apiClient{t: t, base: server.URL, client: &http.Client{Jar: jar}}
 }
 
+// rawCSV is a request body sent as a CSV file instead of JSON.
+type rawCSV string
+
 type apiResponse struct {
 	t      *testing.T
 	Status int
@@ -162,7 +165,10 @@ func (c *apiClient) call(method, path string, body any) apiResponse {
 func (c *apiClient) callWithHeaders(method, path string, body any, headers map[string]string) apiResponse {
 	c.t.Helper()
 	var reader io.Reader
-	if body != nil {
+	contentType := "application/json"
+	if csvBody, ok := body.(rawCSV); ok {
+		reader, contentType = bytes.NewReader([]byte(csvBody)), "text/csv"
+	} else if body != nil {
 		raw, err := json.Marshal(body)
 		if err != nil {
 			c.t.Fatalf("encode %s %s: %v", method, path, err)
@@ -174,7 +180,7 @@ func (c *apiClient) callWithHeaders(method, path string, body any, headers map[s
 		c.t.Fatalf("build %s %s: %v", method, path, err)
 	}
 	if body != nil {
-		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Content-Type", contentType)
 	}
 	for key, value := range headers {
 		request.Header.Set(key, value)

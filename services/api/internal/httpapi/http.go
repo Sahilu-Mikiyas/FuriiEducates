@@ -70,6 +70,7 @@ func (a *API) routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/auth/logout", a.logout)
 	mux.HandleFunc("GET /api/v1/me", a.me)
 	a.registerSchoolRoutes(mux)
+	a.registerPrepRoutes(mux)
 	return a.cors(mux)
 }
 
