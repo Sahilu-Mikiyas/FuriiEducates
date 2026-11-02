@@ -353,3 +353,26 @@ footer span{color:#1d4ed8}
 .offline-downloads .prep-paper-actions{margin-top:8px}
 .offline-start{max-width:360px;margin-top:12px}
 .offline-start input[type=number]{max-width:140px}
+
+/* School mock days */
+.mock-choices{display:flex;flex-wrap:wrap;gap:8px 18px;margin:0;padding:0;border:0}
+.mock-choices legend{padding:0;margin-bottom:6px;color:#41534b;font-size:12px;font-weight:600}
+.mock-heading{margin:6px 0 0;font-size:14px}
+.mock-slots{display:grid;gap:8px}
+.mock-slots h4{margin:8px 0 0;font-size:12px;color:#555}
+.mock-slot{display:grid;grid-template-columns:minmax(120px,170px) minmax(230px,1fr) 110px;align-items:start;gap:12px;padding:10px;border:1px solid #ececec;border-radius:8px}
+.mock-slot>div:first-child{display:grid;gap:2px;font-size:13px}
+.mock-slot small{color:#666;font-size:11px}
+.mock-slot .date-field-time{margin-top:4px}
+.mock-rounds{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.mock-round{min-width:0;padding:12px;border:1px solid #ececec;border-radius:8px}
+.mock-round-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.mock-round-head .operation-actions{flex-wrap:wrap}
+.mock-round-head>div:first-child{display:grid;gap:2px;font-size:14px}
+.mock-round-head small{color:#666;font-size:12px}
+.mock-move{display:grid;gap:6px;min-width:230px}
+.student-mock h3{margin:10px 0 8px;font-size:14px}
+.student-mock h3 b{color:#1d4ed8}
+@media(max-width:700px){
+  .mock-slot{grid-template-columns:1fr}
+}

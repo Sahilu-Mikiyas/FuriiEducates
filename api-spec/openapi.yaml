@@ -183,6 +183,43 @@ paths:
         '201': { description: Recorded }
         '200': { description: Already recorded }
         '401': { description: Authentication required }
+  /prep/mock-rounds:
+    get:
+      summary: List mock days with their timetable and results summary. Teachers see only their classes
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    post:
+      summary: Schedule a mock day, creating one paper per subject for the chosen classes (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Created }
+        '401': { description: Authentication required }
+        '409': { description: A paper has too few approved questions }
+  /prep/mock-rounds/{roundID}/results:
+    get:
+      summary: Results by student, stream, class and paper. Teachers see only their classes
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /prep/mock-rounds/{roundID}/reschedule:
+    post:
+      summary: Move a paper that no student has started (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+        '409': { description: Students have started this paper }
+  /prep/mock-rounds/{roundID}/cancel:
+    post:
+      summary: Cancel a mock day that no student has started (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+        '409': { description: Students have started this mock day }
   /demo-requests:
     post:
       summary: Submit a public school setup request

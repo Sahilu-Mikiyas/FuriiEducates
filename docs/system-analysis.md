@@ -66,7 +66,7 @@ Not yet done: Afaan Oromo and Tigrinya (need translators); the public landing pa
 - Readiness: per-paper estimates with a range, a total out of 600 withheld until all six papers have 15 answers, distance from the 300 line, weak topics, a class table and heatmap, and a school view by stream and class. Estimates describe work on the school's own questions and are labelled as not predicting official results.
 - Migration 00016 adds the tables. Practice now feeds skill evidence at half the weight of timed work. New tests cover approval, answer secrecy, grading, expiry, tenancy, mocks and readiness. The student and teacher flows were exercised in a browser with local test questions only. The administrator approval buttons, CSV upload screen and mock paper form were covered by API tests but not clicked through.
 
-Not yet done: school-wide mock-day scheduling across classes, trend across mock rounds, parent view, SMS or Telegram notices, Afaan Oromo and Tigrinya, and an AI tutor. There are no real exam questions yet: that needs decision 1 in docs/product-plan.md. The 120-minute default for a timed paper is our assumption and should be checked against the official timetable.
+Not yet done: parent view, SMS or Telegram notices, Afaan Oromo and Tigrinya, and an AI tutor. There are no real exam questions yet: that needs decision 1 in docs/product-plan.md. The 120-minute default for a timed paper is our assumption and should be checked against the official timetable.
 
 **2026-11-02 — Offline practice and app install built.**
 
@@ -78,7 +78,18 @@ Not yet done: school-wide mock-day scheduling across classes, trend across mock 
 
 Limits: secure exams and online timed papers cannot be reopened while offline, though their saved answers stay on the device and sync later. Downloaded questions and answers sit unencrypted in browser storage. Installing on real phones, including the iPhone Add to Home Screen path, has not been tested.
 
-Next: real question content, then school mock days.
+**2026-11-02 — School mock days built.**
+
+- An administrator schedules a mock day once: name, classes, streams, questions per paper, and a time and length for each paper. It creates one published paper per subject on the secure exam engine, with shuffled questions, full screen, and optional start codes.
+- Stream papers reach only that stream's students, even in a mixed class. Direct links to the wrong stream's paper are refused, and invigilator counts and rosters match. A student with no stream sees only the common papers, and the administrator is told how many on scheduling.
+- Timetables are checked: all three common papers, whole streams only, and no overlap for one student counting the time allowed to start and the paper's length. Natural and social papers may share a time. Every paper short of questions is listed at once and nothing is created. Questions are drawn exam-only first, then least used in earlier mock days.
+- A paper can move, and a mock day can be cancelled, only until students start.
+- Results roll up by student, stream, class and paper, with a CSV download and a trend across mock days. Totals count only students who sat every paper. Teachers see only their classes. Students see their timetable, scores and total out of 600. Results also feed readiness.
+- Migration 00018 adds the tables. New API tests cover all of this, and the whole flow ran in Edge against a production build, from scheduling through sitting all six papers to teacher and administrator results.
+
+Limits: the mock day has one timetable for all chosen classes, with no rooms or seating. Invigilators open each class's session one at a time. The trend compares different questions, so it is labelled as a rough guide.
+
+Next: real question content, then the parent view and notifications.
 
 ---
 

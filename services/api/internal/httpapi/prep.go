@@ -63,6 +63,7 @@ func (a *API) registerPrepRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/prep/readiness", a.admin(a.schoolReadiness))
 	a.registerPrepPracticeRoutes(mux)
 	a.registerPrepOfflineRoutes(mux)
+	a.registerMockRoundRoutes(mux)
 }
 
 // prepQuestionInput is one four-option exam question in the simple form used by

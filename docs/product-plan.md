@@ -31,7 +31,8 @@ Written 2026-11-01. Companion to [system-analysis.md](system-analysis.md), which
 
 - **Phase 3, frontend restructure** (2026-11-02): routed pages, shared data layer, English and first-draft Amharic, Ethiopian calendar shown alongside Gregorian. Afaan Oromo, Tigrinya and a native review of the Amharic are still open (decision 4 in section 5).
 
-- **National exam prep v1, first slice** (2026-11-02): question bank with approval and CSV import, drills, weak-topic and review practice, exam-format simulator, computer-skills lessons, full mocks out of 600, school mock papers, readiness for students, teachers and leaders. No real questions yet (decision 1 in section 5). Mock-day scheduling, trends, parent view and notifications are next.
+- **National exam prep v1, first slice** (2026-11-02): question bank with approval and CSV import, drills, weak-topic and review practice, exam-format simulator, computer-skills lessons, full mocks out of 600, school mock papers, readiness for students, teachers and leaders. No real questions yet (decision 1 in section 5). Parent view and notifications are next.
+- **School mock days** (2026-11-02): one timetable across classes with the stream split, results by student, stream, class and paper, and a trend across mock days.
 - **Offline practice and app install** (2026-11-02): the app installs and opens with no connection, practice downloads per paper, and finished work uploads and is marked by the server on reconnecting. Exams still need a connection to open.
 
 ### Foundation work

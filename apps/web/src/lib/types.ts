@@ -52,12 +52,20 @@ export type ReadinessTotal = { predicted: number; low: number; high: number; pas
 export type TopicStat = { paper: string; skill_id: string; title: string; responses: number; percent: number; students: number }
 export type ReadinessEstimate = { stream: string; status: string; papers: PaperEstimate[]; total: ReadinessTotal | null; min_responses: number }
 export type PrepMock = { id: string; stream: string; status: string; started_at: string; total?: number; papers: { paper: string; status: string; session_id?: string; score?: number }[] }
-export type PrepHub = { stream: string | null; onboarded: boolean; papers: { paper: string; available: number; due_review: number }[]; readiness: ReadinessEstimate & { weak_topics: TopicStat[] }; active_session: { id?: string; mode?: string; paper?: string }; mocks: PrepMock[] }
+export type PrepHub = { stream: string | null; onboarded: boolean; papers: { paper: string; available: number; due_review: number }[]; readiness: ReadinessEstimate & { weak_topics: TopicStat[] }; active_session: { id?: string; mode?: string; paper?: string }; mocks: PrepMock[]; school_mocks: StudentMockRound[] }
 export type PrepSessionItem = { question_id: string; position: number; topic: string; prompt: string; options: { id: string; text: string }[]; answer: string | null; flagged: boolean; is_correct?: boolean; correct_option?: string; explanation?: string }
 export type PrepSessionView = { id: string; mode: PrepMode; paper: string; status: string; mock_id: string | null; seconds_left: number | null; question_count: number; answered_count: number; correct_count?: number; score_out_of_100?: number; items: PrepSessionItem[] }
 export type ClassReadinessData = { students: (ReadinessEstimate & { student_id: string; student_number: string; student_name: string; onboarded: boolean })[]; topics: TopicStat[]; at_risk: number; pass_line: number }
 export type ReadinessGroup = { key: string; grade_level?: string; name: string; students: number; estimated: number; average_predicted: number | null; above_line: number; near_line: number; at_risk: number }
 export type SchoolReadinessData = { streams: ReadinessGroup[]; classes: ReadinessGroup[]; pass_line: number }
+
+export type MockPaper = { paper: string; opens_at: string; due_at: string; duration_minutes: number; question_count: number; stream: string; in_progress: number; submitted: number }
+export type MockGroup = { key: string; name: string; grade_level?: string; students: number; complete: number; average_total: number | null; below_line: number }
+export type MockSummary = { all: MockGroup; streams: MockGroup[]; classes: MockGroup[]; papers: { paper: string; sat: number; average: number | null }[] }
+export type MockRound = { id: string; name: string; created_at: string; papers: MockPaper[]; summary: MockSummary }
+export type MockStudent = { student_id: string; student_number: string; student_name: string; stream: string; class_id: string; class_name: string; grade_level: string; scores: Record<string, number>; papers_sat: number; papers_expected: number; total: number | null }
+export type MockResults = { students: MockStudent[]; summary: MockSummary; pass_line: number }
+export type StudentMockRound = { id: string; name: string; total?: number; papers: { paper: string; assignment_id: string; opens_at: string | null; due_at: string | null; duration_minutes: number; status: string; score?: number }[] }
 
 export type ClassOption = { id: string; name: string; grade_level: string }
 export const classLabel = (classroom: ClassOption) => `${classroom.grade_level} · ${classroom.name}`

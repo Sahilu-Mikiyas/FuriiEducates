@@ -28,6 +28,7 @@ const SetupRequestsPage = lazy(() => import('../pages/admin/SetupRequestsPage'))
 const SettingsPage = lazy(() => import('../pages/admin/SettingsPage'))
 const ExamPrepPage = lazy(() => import('../pages/admin/ExamPrepPage'))
 const QuestionBankPage = lazy(() => import('../features/prep/QuestionBank').then((m) => ({ default: m.QuestionBank })))
+const MockDaysPage = lazy(() => import('../features/prep/MockDays').then((m) => ({ default: m.MockDays })))
 const TeacherLayout = lazy(() => import('../pages/teacher/TeacherLayout'))
 const ClassPage = lazy(() => import('../pages/teacher/ClassPage'))
 const teacherPage = (name: 'TeacherReadinessPage' | 'TeacherSessionsPage' | 'TeacherGradebookPage' | 'TeacherAnswersPage' | 'TeacherPlanningPage' | 'TeacherAccountPage') =>
@@ -105,6 +106,7 @@ export function App() {
         <Route path="assessments" element={<AssessmentsPage />} />
         <Route path="exam-prep" element={<ExamPrepPage />} />
         <Route path="exam-questions" element={<QuestionBankPage />} />
+        <Route path="mock-days" element={<MockDaysPage />} />
         <Route path="exam-sessions" element={<ExamSessions />} />
         <Route path="results" element={<ResultsPage />} />
         <Route path="finance" element={<FinanceWorkspace />} />
@@ -123,6 +125,7 @@ export function App() {
         <Route path="planning" element={<TeacherPlanningPage />} />
         <Route path="exam-prep" element={<TeacherReadinessPage />} />
         <Route path="exam-questions" element={<QuestionBankPage />} />
+        <Route path="mock-days" element={<MockDaysPage />} />
         <Route path="account" element={<TeacherAccountPage />} />
         <Route path="*" element={<Navigate to="/teach/class" replace />} />
       </Route>

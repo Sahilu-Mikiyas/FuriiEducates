@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router'
 import { useAction } from '../../app/feedback'
 import { useSession } from '../../app/session'
+import { useDates } from '../../calendar/useDates'
 import { OfflinePanel } from '../../features/prep/OfflinePanel'
 import { PaperBars, TotalBadge, usePaperName } from '../../features/prep/readiness'
 import { useI18n } from '../../i18n'
@@ -12,6 +13,7 @@ export const PREP_HUB_PATH = '/student/prep'
 
 export default function PrepHome() {
   const { t, label } = useI18n()
+  const { dateTime } = useDates()
   const navigate = useNavigate()
   const paperName = usePaperName()
   const { busy, run } = useAction()
@@ -68,6 +70,24 @@ export default function PrepHome() {
         <p>{label('prep.mode', hub.active_session.mode ?? '')} · {paperName(hub.active_session.paper ?? '')}</p>
       </div>
       <Link className="primary compact prep-link" to={`/learn/prep/session/${hub.active_session.id}`}>{t('prep.resume')} →</Link>
+    </section>}
+
+    {hub.school_mocks.length > 0 && <section className="panel">
+      <div className="panel-head"><div><p className="eyebrow">{t('mock.eyebrow')}</p><h2>{t('mock.studentTitle')}</h2><p>{t('mock.studentHelp')}</p></div></div>
+      {hub.school_mocks.map((round) => <div className="student-mock" key={round.id}>
+        <h3>{round.name}{round.total !== undefined && <b> · {Math.round(round.total)} / 600</b>}</h3>
+        <div className="prep-papers">
+          {round.papers.map((paper) => <article className="prep-paper" key={paper.paper}>
+            <div>
+              <strong>{paperName(paper.paper)}</strong>
+              <small>{dateTime(paper.opens_at)} · {t('common.minutesShort', { n: paper.duration_minutes })}</small>
+            </div>
+            {paper.status === 'submitted'
+              ? <span className="status-pill">{paper.score !== undefined ? `${Math.round(paper.score)} / 100` : label('status', paper.status)}</span>
+              : <Link className="secondary compact prep-link" to={`/learn/assessments/${paper.assignment_id}`}>{paper.status === 'in_progress' ? t('prep.resume') : t('mock.openPaper')}</Link>}
+          </article>)}
+        </div>
+      </div>)}
     </section>}
 
     <section className="panel">

@@ -75,7 +75,7 @@ func (a *API) listExamSessions(w http.ResponseWriter, r *http.Request, id auth.I
 	rows, err := a.db.Query(r.Context(), `
 		SELECT aa.id::text,a.title,c.id::text,c.name,c.grade_level,a.duration_minutes,a.locked_mode,aa.requires_start_code,aa.session_open,
 		       to_char(aa.opens_at AT TIME ZONE 'UTC',`+isoTimestamp+`),to_char(aa.due_at AT TIME ZONE 'UTC',`+isoTimestamp+`),
-		       (SELECT count(*)::int FROM enrollments e WHERE e.class_id=aa.class_id AND e.school_id=aa.school_id AND e.status='active'),
+		       (SELECT count(*)::int FROM enrollments e JOIN students s ON s.id=e.student_id AND s.school_id=e.school_id WHERE e.class_id=aa.class_id AND e.school_id=aa.school_id AND e.status='active' AND (aa.stream IS NULL OR aa.stream=s.stream)),
 		       (SELECT count(*)::int FROM assessment_attempts t WHERE t.assignment_id=aa.id AND t.status='in_progress'),
 		       (SELECT count(*)::int FROM assessment_attempts t WHERE t.assignment_id=aa.id AND t.status='submitted')
 		FROM assessment_assignments aa
@@ -151,7 +151,8 @@ func (a *API) getExamSession(w http.ResponseWriter, r *http.Request, id auth.Ide
 		FROM enrollments e
 		JOIN students s ON s.id=e.student_id AND s.school_id=e.school_id
 		LEFT JOIN assessment_attempts t ON t.assignment_id=$1 AND t.student_id=s.id
-		WHERE e.class_id=$2 AND e.school_id=$3 AND e.status='active' AND s.status='active'
+		LEFT JOIN assessment_assignments aa ON aa.id=$1
+		WHERE e.class_id=$2 AND e.school_id=$3 AND e.status='active' AND s.status='active' AND (aa.stream IS NULL OR aa.stream=s.stream OR t.id IS NOT NULL)
 		ORDER BY s.legal_name,s.student_number LIMIT 1000`, assignmentID, classID, id.SchoolID)
 	if err != nil {
 		a.serverError(w, r, err)

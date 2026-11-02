@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -724,4 +725,279 @@ func uuid(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return value
+}
+
+func futureTimetable(papers []string, start time.Time, gap time.Duration) []map[string]any {
+	slots := []map[string]any{}
+	for i, paper := range papers {
+		slots = append(slots, map[string]any{"paper": paper, "opens_at": start.Add(time.Duration(i) * gap).UTC().Format(time.RFC3339), "duration_minutes": 60})
+	}
+	return slots
+}
+
+func TestMockTimetableProblem(t *testing.T) {
+	start := time.Date(2027, 3, 1, 8, 0, 0, 0, time.UTC)
+	slots := func(gap time.Duration, papers ...string) []mockSlot {
+		out := []mockSlot{}
+		for i, paper := range papers {
+			out = append(out, mockSlot{paper, start.Add(time.Duration(i) * gap), 60})
+		}
+		return out
+	}
+	natural := streamPapers("natural")
+	if problem := mockTimetableProblem(slots(2*time.Hour, natural...), 30); problem != "" {
+		t.Fatalf("a spaced timetable should pass: %s", problem)
+	}
+	if problem := mockTimetableProblem(slots(2*time.Hour, "english", "mathematics", "physics", "chemistry", "biology"), 30); !strings.Contains(problem, "Aptitude") {
+		t.Fatalf("common papers are required: %q", problem)
+	}
+	if problem := mockTimetableProblem(slots(2*time.Hour, "english", "mathematics", "aptitude", "physics", "chemistry"), 30); !strings.Contains(problem, "all three") {
+		t.Fatalf("part of a stream is not allowed: %q", problem)
+	}
+	if problem := mockTimetableProblem(slots(2*time.Hour, commonPapers...), 30); problem == "" {
+		t.Fatal("a mock day needs at least one stream")
+	}
+	// 60 minutes to sit plus 30 to start means a paper can run 90 minutes after opening.
+	if problem := mockTimetableProblem(slots(80*time.Minute, natural...), 30); !strings.Contains(problem, "overlap") {
+		t.Fatalf("papers that overlap for one student must be refused: %q", problem)
+	}
+	// A natural and a social paper may share a time, because no student sits both.
+	both := slots(2*time.Hour, natural...)
+	for i, paper := range socialPapers {
+		both = append(both, mockSlot{paper, start.Add(time.Duration(3+i) * 2 * time.Hour), 60})
+	}
+	if problem := mockTimetableProblem(both, 30); problem != "" {
+		t.Fatalf("parallel stream papers should pass: %s", problem)
+	}
+}
+
+func TestSummariseMockRoundCountsOnlyCompleteSittings(t *testing.T) {
+	total := func(value float64) *float64 { return &value }
+	summary := summariseMockRound([]*mockStudent{
+		{StudentID: "a", Stream: "natural", ClassID: "c1", ClassName: "A", Scores: map[string]float64{"english": 80}, Total: total(480)},
+		{StudentID: "b", Stream: "natural", ClassID: "c1", ClassName: "A", Scores: map[string]float64{"english": 40}, Total: total(240)},
+		{StudentID: "c", Stream: "social", ClassID: "c2", ClassName: "B", Scores: map[string]float64{"english": 10}},
+		{StudentID: "d", Stream: "", ClassID: "c2", ClassName: "B", Scores: map[string]float64{}},
+	})
+	if summary.All.Students != 4 || summary.All.Complete != 2 || *summary.All.Average != 360 || summary.All.Below != 1 {
+		t.Fatalf("all: %+v", summary.All)
+	}
+	if natural := summary.Streams[0]; natural.Students != 2 || *natural.Average != 360 {
+		t.Fatalf("natural: %+v", natural)
+	}
+	if social := summary.Streams[1]; social.Students != 1 || social.Complete != 0 || social.Average != nil {
+		t.Fatalf("an incomplete sitting must not produce an average: %+v", social)
+	}
+	if len(summary.Classes) != 2 || summary.Classes[1].Students != 2 {
+		t.Fatalf("classes: %+v", summary.Classes)
+	}
+	if english := summary.Papers[0]; english.Paper != "english" || english.Sat != 3 || math.Abs(*english.Average-130.0/3) > 0.01 {
+		t.Fatalf("paper averages count every sitter: %+v", english)
+	}
+}
+
+func TestMockRoundRunsAcrossStreamsAndRollsUp(t *testing.T) {
+	server, admin, teacher, learner, classID, studentID := prepFixture(t)
+	socialID, socialLearner := enrollLearner(server, admin, classID)
+	noStreamID, noStreamLearner := enrollLearner(server, admin, classID)
+	_ = noStreamID
+	admin.call("PUT", "/prep/students/"+studentID+"/stream", map[string]any{"stream": "natural"}).expect(http.StatusOK)
+	admin.call("PUT", "/prep/students/"+socialID+"/stream", map[string]any{"stream": "social"}).expect(http.StatusOK)
+	otherClass := createClass(admin)
+	_, otherClassLearner := enrollLearner(server, admin, otherClass)
+
+	all := slices.Concat(commonPapers, naturalPapers, socialPapers)
+	start := time.Now().Add(time.Hour)
+	body := map[string]any{"name": "Term 1 mock", "class_ids": []string{classID}, "question_count": 5, "start_window_minutes": 30, "papers": futureTimetable(all, start, 2*time.Hour)}
+
+	// Too few questions: every short paper is named, and nothing is created.
+	short := admin.call("POST", "/prep/mock-rounds", body).expect(http.StatusConflict)
+	if !strings.Contains(string(short.Body), "English has 0") || !strings.Contains(string(short.Body), "Economics has 0") {
+		t.Fatalf("shortages should be listed: %s", short.Body)
+	}
+	if rows := admin.call("GET", "/prep/mock-rounds", nil).expect(http.StatusOK).list(); len(rows) != 0 {
+		t.Fatalf("a refused mock day must create nothing: %v", rows)
+	}
+	for _, paper := range all {
+		addPrepQuestions(t, admin, paper, 5, true)
+	}
+	teacher.call("POST", "/prep/mock-rounds", body).expect(http.StatusForbidden)
+	created := admin.call("POST", "/prep/mock-rounds", body).expect(http.StatusCreated).object()
+	roundID := created["id"].(string)
+	if created["papers"] != float64(9) || created["students_without_stream"] != float64(1) || created["students_without_papers"] != float64(0) {
+		t.Fatalf("created: %v", created)
+	}
+
+	papersFor := func(client *apiClient) map[string]string {
+		found := map[string]string{}
+		hub := client.call("GET", "/student/prep", nil).expect(http.StatusOK).object()
+		for _, raw := range hub["school_mocks"].([]any) {
+			for _, entry := range raw.(map[string]any)["papers"].([]any) {
+				paper := entry.(map[string]any)
+				found[paper["paper"].(string)] = paper["assignment_id"].(string)
+			}
+		}
+		return found
+	}
+	natural, social, unset := papersFor(learner), papersFor(socialLearner), papersFor(noStreamLearner)
+	if len(natural) != 6 || natural["physics"] == "" || natural["history"] != "" {
+		t.Fatalf("a natural student sits the natural papers: %v", natural)
+	}
+	if len(social) != 6 || social["history"] == "" || social["physics"] != "" {
+		t.Fatalf("a social student sits the social papers: %v", social)
+	}
+	if len(unset) != 3 || unset["english"] == "" {
+		t.Fatalf("a student with no stream sees only the common papers: %v", unset)
+	}
+	if other := papersFor(otherClassLearner); len(other) != 0 {
+		t.Fatalf("another class must not be included: %v", other)
+	}
+
+	// The wrong stream's paper is closed even by direct address.
+	socialLearner.call("GET", "/student/assessments/"+natural["physics"], nil).expect(http.StatusNotFound)
+	socialLearner.call("POST", "/student/assessments/"+natural["physics"]+"/start", map[string]any{}).expect(http.StatusNotFound)
+	listed := socialLearner.call("GET", "/student/assessments", nil).expect(http.StatusOK).list()
+	if len(listed) != 6 {
+		t.Fatalf("the student's list should hold six papers, got %d", len(listed))
+	}
+	sessions := teacher.call("GET", "/exam-sessions", nil).expect(http.StatusOK).list()
+	for _, session := range sessions {
+		if session["assignment_id"] == natural["physics"] {
+			if session["enrolled"] != float64(1) {
+				t.Fatalf("the invigilator's count should cover only the stream: %v", session)
+			}
+			roster := teacher.call("GET", "/exam-sessions/"+natural["physics"], nil).expect(http.StatusOK).object()["roster"].([]any)
+			if len(roster) != 1 {
+				t.Fatalf("the invigilator's roster should cover only the stream: %v", roster)
+			}
+		}
+	}
+
+	// Nothing opens before its time.
+	learner.call("POST", "/student/assessments/"+natural["english"]+"/start", map[string]any{}).expect(http.StatusConflict)
+
+	// Rescheduling keeps the timetable sound.
+	opensBetween := start.Add(30 * time.Minute).UTC().Format(time.RFC3339)
+	admin.call("POST", "/prep/mock-rounds/"+roundID+"/reschedule", map[string]any{"paper": "mathematics", "opens_at": opensBetween}).expect(http.StatusBadRequest)
+	admin.call("POST", "/prep/mock-rounds/"+roundID+"/reschedule", map[string]any{"paper": "mathematics", "opens_at": "2020-01-01T00:00:00Z"}).expect(http.StatusBadRequest)
+	later := start.Add(40 * time.Hour).UTC().Format(time.RFC3339)
+	admin.call("POST", "/prep/mock-rounds/"+roundID+"/reschedule", map[string]any{"paper": "mathematics", "opens_at": later}).expect(http.StatusOK)
+	teacher.call("POST", "/prep/mock-rounds/"+roundID+"/reschedule", map[string]any{"paper": "mathematics", "opens_at": later}).expect(http.StatusForbidden)
+
+	// Open everything now and sit it: A is always right.
+	if _, err := testDB.Exec(context.Background(), `UPDATE assessment_assignments aa SET opens_at=now()-interval '1 minute',due_at=now()+interval '1 hour' FROM assessments a WHERE a.id=aa.assessment_id AND a.mock_round_id=$1`, roundID); err != nil {
+		t.Fatal(err)
+	}
+	sit := func(client *apiClient, assignmentID, answer string) {
+		t.Helper()
+		attempt := client.call("POST", "/student/assessments/"+assignmentID+"/start", map[string]any{}).expect(http.StatusCreated).object()
+		opened := client.call("GET", "/student/assessments/"+assignmentID, nil).expect(http.StatusOK).object()
+		answers := map[string]any{}
+		for _, raw := range opened["questions"].([]any) {
+			answers[raw.(map[string]any)["id"].(string)] = answer
+		}
+		client.call("POST", "/student/attempts/"+attempt["attempt_id"].(string)+"/submit", map[string]any{"answers": answers}).expect(http.StatusOK)
+	}
+	// The natural student gets all six right: 600.
+	for _, assignmentID := range natural {
+		sit(learner, assignmentID, "A")
+	}
+	// The social student gets one paper wrong and misses nothing else yet.
+	sit(socialLearner, social["english"], "B")
+
+	// Started papers can no longer be moved or cancelled.
+	admin.call("POST", "/prep/mock-rounds/"+roundID+"/reschedule", map[string]any{"paper": "english", "opens_at": later}).expect(http.StatusConflict)
+	admin.call("POST", "/prep/mock-rounds/"+roundID+"/cancel", map[string]any{}).expect(http.StatusConflict)
+
+	results := admin.call("GET", "/prep/mock-rounds/"+roundID+"/results", nil).expect(http.StatusOK).object()
+	summary := results["summary"].(map[string]any)
+	all2 := summary["all"].(map[string]any)
+	if all2["students"] != float64(3) || all2["complete"] != float64(1) || all2["average_total"] != float64(600) || all2["below_line"] != float64(0) {
+		t.Fatalf("summary: %v", all2)
+	}
+	var mine map[string]any
+	for _, raw := range results["students"].([]any) {
+		if row := raw.(map[string]any); row["student_id"] == studentID {
+			mine = row
+		}
+	}
+	if mine == nil || mine["total"] != float64(600) || mine["papers_sat"] != float64(6) || mine["scores"].(map[string]any)["physics"] != float64(100) {
+		t.Fatalf("the natural student's row: %v", mine)
+	}
+	for _, raw := range results["students"].([]any) {
+		if row := raw.(map[string]any); row["student_id"] == socialID && row["total"] != nil {
+			t.Fatalf("a partial sitting has no total: %v", row)
+		}
+	}
+	hub := learner.call("GET", "/student/prep", nil).expect(http.StatusOK).object()
+	if round := hub["school_mocks"].([]any)[0].(map[string]any); round["total"] != float64(600) {
+		t.Fatalf("the student should see their total: %v", round)
+	}
+	if readiness := hub["readiness"].(map[string]any); len(readiness["papers"].([]any)) != 6 {
+		t.Fatalf("mock results feed readiness: %v", readiness)
+	}
+
+	// Trend data, and staff limits.
+	rounds := admin.call("GET", "/prep/mock-rounds", nil).expect(http.StatusOK).list()
+	if len(rounds) != 1 || len(rounds[0]["papers"].([]any)) != 9 {
+		t.Fatalf("rounds: %v", rounds)
+	}
+	teacherRounds := teacher.call("GET", "/prep/mock-rounds", nil).expect(http.StatusOK).list()
+	if len(teacherRounds) != 1 {
+		t.Fatalf("an assigned teacher sees the round: %v", teacherRounds)
+	}
+	_, otherTeacher := inviteTeacher(server, admin)
+	if rows := otherTeacher.call("GET", "/prep/mock-rounds", nil).expect(http.StatusOK).list(); len(rows) != 0 {
+		t.Fatalf("a teacher of other classes must not see the round: %v", rows)
+	}
+	if rows := otherTeacher.call("GET", "/prep/mock-rounds/"+roundID+"/results", nil).expect(http.StatusOK).object()["students"].([]any); len(rows) != 0 {
+		t.Fatalf("a teacher of other classes must not see results: %v", rows)
+	}
+	learner.call("GET", "/prep/mock-rounds", nil).expect(http.StatusForbidden)
+	learner.call("GET", "/prep/mock-rounds/"+roundID+"/results", nil).expect(http.StatusForbidden)
+	_, otherSchool := seedSchool(t, server)
+	otherSchool.call("GET", "/prep/mock-rounds/"+roundID+"/results", nil).expect(http.StatusNotFound)
+	otherSchool.call("POST", "/prep/mock-rounds/"+roundID+"/cancel", map[string]any{}).expect(http.StatusNotFound)
+	otherSchool.call("POST", "/prep/mock-rounds", map[string]any{"name": "X", "class_ids": []string{classID}, "question_count": 5, "start_window_minutes": 30, "papers": futureTimetable(streamPapers("natural"), start, 2*time.Hour)}).expect(http.StatusBadRequest)
+}
+
+func TestMockRoundCanBeCancelledBeforeAnyoneStarts(t *testing.T) {
+	_, admin, _, learner, classID, studentID := prepFixture(t)
+	admin.call("PUT", "/prep/students/"+studentID+"/stream", map[string]any{"stream": "natural"}).expect(http.StatusOK)
+	papers := streamPapers("natural")
+	for _, paper := range papers {
+		addPrepQuestions(t, admin, paper, 5, true)
+	}
+	create := func() string {
+		return admin.create("/prep/mock-rounds", map[string]any{"name": "Round", "class_ids": []string{classID}, "question_count": 5, "start_window_minutes": 30, "requires_start_code": true, "papers": futureTimetable(papers, time.Now().Add(time.Hour), 2*time.Hour)})
+	}
+	roundID := create()
+	created := admin.call("GET", "/prep/mock-rounds", nil).expect(http.StatusOK).list()
+	if len(created) != 1 {
+		t.Fatalf("rounds: %v", created)
+	}
+	hub := learner.call("GET", "/student/prep", nil).expect(http.StatusOK).object()
+	assignment := hub["school_mocks"].([]any)[0].(map[string]any)["papers"].([]any)[0].(map[string]any)["assignment_id"].(string)
+	if view := learner.call("GET", "/student/assessments/"+assignment, nil).expect(http.StatusOK).object(); view["requires_start_code"] != true || view["national_paper"] == nil {
+		t.Fatalf("a mock paper can require a start code: %v", view)
+	}
+	admin.call("POST", "/prep/mock-rounds/"+roundID+"/cancel", map[string]any{}).expect(http.StatusOK)
+	if rows := admin.call("GET", "/prep/mock-rounds", nil).expect(http.StatusOK).list(); len(rows) != 0 {
+		t.Fatalf("a cancelled round should go: %v", rows)
+	}
+	learner.call("GET", "/student/assessments/"+assignment, nil).expect(http.StatusNotFound)
+	if listed := learner.call("GET", "/student/assessments", nil).expect(http.StatusOK).list(); len(listed) != 0 {
+		t.Fatalf("students should no longer see it: %v", listed)
+	}
+
+	// Questions are reused least-first across rounds.
+	first := create()
+	second := create()
+	var repeats int
+	if err := testDB.QueryRow(context.Background(), `SELECT count(*) FROM assessment_items x JOIN assessments ax ON ax.id=x.assessment_id JOIN assessment_items y ON y.question_id=x.question_id JOIN assessments ay ON ay.id=y.assessment_id WHERE ax.mock_round_id=$1 AND ay.mock_round_id=$2`, first, second).Scan(&repeats); err != nil {
+		t.Fatal(err)
+	}
+	if repeats != 30 {
+		t.Fatalf("with exactly enough questions both rounds use all 30, got %d", repeats)
+	}
 }

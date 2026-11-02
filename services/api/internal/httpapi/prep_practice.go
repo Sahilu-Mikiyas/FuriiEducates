@@ -747,7 +747,12 @@ func (a *API) studentPrepHub(w http.ResponseWriter, r *http.Request, id auth.Ide
 		a.serverError(w, r, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"data": map[string]any{"stream": stream, "onboarded": onboarded, "papers": papers, "readiness": readiness, "active_session": active, "mocks": mocks}})
+	schoolMocks, err := a.studentMockRounds(ctx, id.SchoolID, studentID)
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"data": map[string]any{"stream": stream, "onboarded": onboarded, "papers": papers, "readiness": readiness, "active_session": active, "mocks": mocks, "school_mocks": schoolMocks}})
 }
 
 // studentMocks lists recent full mocks with each paper's state and the total

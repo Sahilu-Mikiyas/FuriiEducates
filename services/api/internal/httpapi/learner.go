@@ -220,7 +220,7 @@ func (a *API) listStudentAssessments(w http.ResponseWriter, r *http.Request, id 
 		a.serverError(w, r, err)
 		return
 	}
-	rows, err := a.db.Query(r.Context(), `SELECT aa.id::text,a.title,a.instructions,c.name,c.grade_level,aa.assigned_at::text,COALESCE(aa.due_at::text,''),COALESCE(at.status,'not_started'),COALESCE(at.id::text,'') FROM assessment_assignments aa JOIN assessments a ON a.id=aa.assessment_id AND a.school_id=aa.school_id JOIN classes c ON c.id=aa.class_id AND c.school_id=aa.school_id JOIN enrollments e ON e.class_id=c.id AND e.school_id=c.school_id AND e.student_id=$2 AND e.status='active' JOIN students s ON s.id=e.student_id AND s.school_id=e.school_id AND s.status='active' LEFT JOIN assessment_attempts at ON at.assignment_id=aa.id AND at.student_id=$2 WHERE aa.school_id=$1 AND a.status='published' ORDER BY aa.assigned_at DESC LIMIT 100`, id.SchoolID, studentID)
+	rows, err := a.db.Query(r.Context(), `SELECT aa.id::text,a.title,a.instructions,c.name,c.grade_level,aa.assigned_at::text,COALESCE(aa.due_at::text,''),COALESCE(at.status,'not_started'),COALESCE(at.id::text,'') FROM assessment_assignments aa JOIN assessments a ON a.id=aa.assessment_id AND a.school_id=aa.school_id JOIN classes c ON c.id=aa.class_id AND c.school_id=aa.school_id JOIN enrollments e ON e.class_id=c.id AND e.school_id=c.school_id AND e.student_id=$2 AND e.status='active' JOIN students s ON s.id=e.student_id AND s.school_id=e.school_id AND s.status='active' LEFT JOIN assessment_attempts at ON at.assignment_id=aa.id AND at.student_id=$2 WHERE aa.school_id=$1 AND a.status='published' AND (aa.stream IS NULL OR aa.stream=s.stream OR at.id IS NOT NULL) ORDER BY aa.assigned_at DESC LIMIT 100`, id.SchoolID, studentID)
 	if err != nil {
 		a.serverError(w, r, err)
 		return
@@ -284,7 +284,9 @@ func (a *API) studentAssignment(w http.ResponseWriter, r *http.Request, id auth.
 		FROM assessment_assignments aa
 		JOIN assessments a ON a.id=aa.assessment_id AND a.school_id=aa.school_id
 		JOIN enrollments e ON e.class_id=aa.class_id AND e.school_id=aa.school_id AND e.student_id=$3 AND e.status='active'
-		WHERE aa.id=$1 AND aa.school_id=$2 AND a.status='published'`, r.PathValue("assignmentID"), id.SchoolID, studentID).Scan(
+		JOIN students s ON s.id=e.student_id AND s.school_id=e.school_id
+		WHERE aa.id=$1 AND aa.school_id=$2 AND a.status='published'
+		AND (aa.stream IS NULL OR aa.stream=s.stream OR EXISTS(SELECT 1 FROM assessment_attempts t WHERE t.assignment_id=aa.id AND t.student_id=s.id))`, r.PathValue("assignmentID"), id.SchoolID, studentID).Scan(
 		&view.Title, &view.Instructions, &view.DurationMinutes, &view.QuestionCount, &view.RequiresStartCode, &view.SessionOpen, &view.StartCode, &view.LockedMode, &view.NationalPaper, &view.OpensAt, &view.DueAt, &view.NotOpenYet, &view.PastDue)
 	if errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, 404, "NOT_FOUND", "This assessment is not assigned to your active class.", nil)
