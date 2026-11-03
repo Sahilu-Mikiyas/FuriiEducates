@@ -741,35 +741,38 @@ func (a *API) unpublishReports(w http.ResponseWriter, r *http.Request, id auth.I
 	writeJSON(w, 200, map[string]any{"data": map[string]string{"term_id": req.TermID}})
 }
 
-// studentReportCards returns a student's own published cards, newest first.
+// studentReportCards returns a student's own published cards.
 func (a *API) studentReportCards(w http.ResponseWriter, r *http.Request, id auth.Identity) {
 	studentID, ok := a.prepStudent(w, r, id)
 	if !ok {
 		return
 	}
-	rows, err := a.db.Query(r.Context(), `SELECT rc.card FROM report_cards rc JOIN academic_terms t ON t.id=rc.term_id WHERE rc.student_id=$1 AND rc.school_id=$2 ORDER BY t.starts_on DESC`, studentID, id.SchoolID)
+	cards, err := a.cardsForStudent(r.Context(), id.SchoolID, studentID)
 	if err != nil {
 		a.serverError(w, r, err)
 		return
+	}
+	writeJSON(w, 200, map[string]any{"data": cards})
+}
+
+// cardsForStudent reads a student's published cards, newest first.
+func (a *API) cardsForStudent(ctx context.Context, schoolID, studentID string) ([]reportCard, error) {
+	rows, err := a.db.Query(ctx, `SELECT rc.card FROM report_cards rc JOIN academic_terms t ON t.id=rc.term_id WHERE rc.student_id=$1 AND rc.school_id=$2 ORDER BY t.starts_on DESC`, studentID, schoolID)
+	if err != nil {
+		return nil, err
 	}
 	defer rows.Close()
 	cards := []reportCard{}
 	for rows.Next() {
 		var raw []byte
 		if err = rows.Scan(&raw); err != nil {
-			a.serverError(w, r, err)
-			return
+			return nil, err
 		}
 		var card reportCard
 		if err = json.Unmarshal(raw, &card); err != nil {
-			a.serverError(w, r, err)
-			return
+			return nil, err
 		}
 		cards = append(cards, card)
 	}
-	if err = rows.Err(); err != nil {
-		a.serverError(w, r, err)
-		return
-	}
-	writeJSON(w, 200, map[string]any{"data": cards})
+	return cards, rows.Err()
 }

@@ -32,11 +32,12 @@ export function PageLoading() {
 }
 
 // WorkspaceLinks lets someone with several roles move between their workspaces.
-export function WorkspaceLinks({ identity, current }: { identity: Identity; current: 'admin' | 'teacher' }) {
+export function WorkspaceLinks({ identity, current }: { identity: Identity; current: 'admin' | 'teacher' | 'parent' }) {
   const { t } = useI18n()
   return <>
     {current !== 'admin' && identity.roles.includes('school_admin') && <Link className="workspace-link" to="/admin/overview">{t('workspace.openAdmin')}</Link>}
     {current !== 'teacher' && identity.roles.includes('teacher') && <Link className="workspace-link" to="/teach/class">{t('workspace.openTeacher')}</Link>}
+    {current !== 'parent' && identity.roles.includes('parent') && <Link className="workspace-link" to="/family">{t('workspace.openParent')}</Link>}
   </>
 }
 

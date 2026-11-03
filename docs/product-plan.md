@@ -184,7 +184,7 @@ Module B above.
 - **Operations:** discipline and behaviour records, counselling notes (restricted access), clinic visits, special needs plans, clubs, sports, events.
 - **Automate:** parent notification of serious incidents, follow-up reminders for counsellors, club membership and attendance.
 
-### 3.11 Communication and parent portal (New)
+### 3.11 Communication and parent portal (Partial: the parent portal is built; SMS, notifications and messaging are not)
 - **Operations:** announcements, class news, parent and teacher messaging, meeting scheduling, emergency alerts, circulars.
 - **Automate:**
   - SMS, Telegram and email delivery from one place;
@@ -284,6 +284,7 @@ Steps 1 to 4 should be the focus between now and early 2027.
 5. **Pricing:** per student, per module, or exam prep sold separately.
 6. **Hosting:** moving the API off Render's free tier before any pilot.
 7. **Pilot schools:** which schools pilot exam prep, and when.
+8. **SMS:** which provider sends messages to parents, and whether parents without email sign in by phone.
 
 ---
 

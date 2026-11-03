@@ -69,7 +69,8 @@ export function useSession(enabled = true) {
 export const homePath = (identity: Identity) => {
   if (identity.roles.includes('student')) return '/learn'
   if (identity.roles.includes('school_admin')) return '/admin/overview'
-  return '/teach/class'
+  if (identity.roles.includes('teacher')) return '/teach/class'
+  return '/family'
 }
 
 // useLogout ends the session and removes every cached record and downloaded

@@ -6,8 +6,8 @@ import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { useRefresh, useStaff, useStudents } from '../../lib/queries'
 import type { FinanceEntry, FinanceSummary } from '../../lib/types'
+import { money } from '../../lib/money'
 
-const money = (minor: number, currency = 'ETB') => new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(minor / 100)
 
 export function FinanceWorkspace() {
   const { t, label } = useI18n()

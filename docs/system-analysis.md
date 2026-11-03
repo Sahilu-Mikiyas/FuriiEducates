@@ -115,7 +115,18 @@ Limits: attendance is daily per class, not per period, and staff attendance is n
 
 Limits: the default grade bands have not been checked against Ministry or regional rules. Promotion decisions and transcripts are not built, so a card makes no pass or fail statement beyond marking totals below the pass mark. Marks are entered by hand or pasted, and online exam scores do not flow into them yet. A report covers the students now in the class, so a student who moves mid-term has missing marks in the new class and no card from the old one for that term. Subject averages are unweighted across subjects. Any teacher of the class can write conduct and comments, because there is no homeroom teacher role yet. Printing depends on the device's browser and has only been tested in Edge. Server validation messages are still in English on Amharic screens, and the Amharic text is a draft that needs a native speaker's review.
 
-Next in core operations: the parent portal and SMS, which need an SMS provider chosen.
+**2026-11-03 — Parent portal built.**
+
+- From a student's profile, an administrator invites a guardian with a one-time link, shared by hand for now. Parents choose their own password. Someone who already has an account in the school is linked straight away, and invitations waiting for the same email are all accepted together, so a parent of several children has one account. A student's account cannot become a parent's. Administrators can create a password reset link and remove access, which takes effect at once.
+- Parents see only the children linked to them: a summary of each, then attendance with the school's reasons, published report cards they can print, fees with the balance due, and national exam readiness once a stream is chosen. Marks that are not published stay out of view, and reports taken back disappear for parents too.
+- "How they are doing" picks the strongest subjects and those with the most room to improve from the latest card, with the change since the last term. It compares a child only with themself.
+- Fee balances use the same sum as the finance screen, per currency, leaving out voided entries.
+- Migration 00021 adds the link and invitations. New API tests cover all of this, including parents reaching only their own children. The whole flow ran in Edge against a production build, in English and Amharic and at phone width. That run caught parents being turned away by an old role check on the sign-in page, now fixed.
+- The Amharic for attendance and report wording used masculine verbs that would misdescribe girls, so it now uses gender-neutral forms.
+
+Limits: nothing is sent to parents, so they must open the portal, and no SMS goes out until a provider is chosen. Sign-in needs an email address, which not every parent has, so sign-in by phone should come with SMS. Invitation links are copied and shared by staff. Parents cannot message the school, see marks before publishing, or see day-to-day learning such as assignments. Attendance reasons and fee descriptions that staff type are now visible to families.
+
+Next: choose an SMS provider, and decide whether a student learning plan and assignments come next.
 
 ---
 

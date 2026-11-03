@@ -75,6 +75,7 @@ func (a *API) routes() http.Handler {
 	a.registerAttendanceRoutes(mux)
 	a.registerMarkRoutes(mux)
 	a.registerReportRoutes(mux)
+	a.registerParentRoutes(mux)
 	return a.cors(mux)
 }
 

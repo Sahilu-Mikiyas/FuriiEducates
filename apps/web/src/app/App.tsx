@@ -47,6 +47,11 @@ const TeacherGradebookPage = teacherPage('TeacherGradebookPage')
 const TeacherAnswersPage = teacherPage('TeacherAnswersPage')
 const TeacherPlanningPage = teacherPage('TeacherPlanningPage')
 const TeacherAccountPage = teacherPage('TeacherAccountPage')
+const ParentLayout = lazy(() => import('../pages/parent/ParentLayout'))
+const parentPage = (name: 'ParentHome' | 'ChildPage' | 'ParentAccountPage') => lazy(() => import('../pages/parent/pages').then((m) => ({ default: m[name] })))
+const ParentHome = parentPage('ParentHome')
+const ChildPage = parentPage('ChildPage')
+const ParentAccountPage = parentPage('ParentAccountPage')
 const learnerWorkspace = () => import('../pages/learner/workspace')
 const LearnerLayout = lazy(() => learnerWorkspace().then((m) => ({ default: m.LearnerLayout })))
 const LearnerHome = lazy(() => learnerWorkspace().then((m) => ({ default: m.LearnerHome })))
@@ -89,7 +94,7 @@ export function App() {
 
   // Invitation and reset links are read once at start; reload when one is pasted into an open tab.
   useEffect(() => {
-    const onHashChange = () => { if (/(^|[#&])(invite|student-invite|reset)=/.test(window.location.hash)) window.location.reload() }
+    const onHashChange = () => { if (/(^|[#&])(invite|student-invite|parent-invite|reset)=/.test(window.location.hash)) window.location.reload() }
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
@@ -97,9 +102,11 @@ export function App() {
   const resetToken = hashValue('reset')
   const staffInvite = hashValue('invite')
   const studentInvite = hashValue('student-invite')
+  const parentInvite = hashValue('parent-invite')
   if (resetToken) return <PasswordResetPage token={resetToken} />
   if (staffInvite) return <InvitePage kind="staff" token={staffInvite} role={hashValue('invite-role') || 'teacher'} />
   if (studentInvite) return <InvitePage kind="student" token={studentInvite} />
+  if (parentInvite) return <InvitePage kind="parent" token={parentInvite} />
 
   return <Suspense fallback={<Loading />}>
     <Routes>
@@ -157,6 +164,13 @@ export function App() {
         <Route path="prep/session/:sessionID" element={<PrepSessionRoute />} />
         <Route path="prep/offline/:packID" element={<OfflineSittingRoute />} />
         <Route path="*" element={<Navigate to="/learn" replace />} />
+      </Route>
+      <Route path="/family" element={<RequireRole role="parent" render={(user) => <ParentLayout identity={user} />} />}>
+        <Route index element={<Navigate to="children" replace />} />
+        <Route path="children" element={<ParentHome />} />
+        <Route path="children/:studentID" element={<ChildPage />} />
+        <Route path="account" element={<ParentAccountPage />} />
+        <Route path="*" element={<Navigate to="/family/children" replace />} />
       </Route>
       <Route path="*" element={<HomeRedirect />} />
     </Routes>

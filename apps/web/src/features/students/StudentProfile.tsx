@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
-import { useAction } from '../../app/feedback'
+import { useAction, useFeedback } from '../../app/feedback'
 import { DateField } from '../../calendar/DateField'
 import { useDates } from '../../calendar/useDates'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { useClasses, useRefresh } from '../../lib/queries'
 import { classLabel, Guardian, StudentProfileData } from '../../lib/types'
+import { CopyLinkResult, passwordResetLink } from '../account/account'
 import { AttendanceSummary } from '../attendance/AttendanceSummary'
 
 const RELATIONSHIPS = ['mother', 'father', 'guardian', 'other']
@@ -118,8 +119,7 @@ function Guardians({ studentID, guardians, canEdit, path }: { studentID: string;
     setEditing('')
   }, t('guardian.saved'), false)
   const makePrimary = (guardian: Guardian) => run(async () => {
-    const { id, ...details } = guardian
-    await api(`${base}/${id}`, { method: 'PUT', body: JSON.stringify({ ...details, is_primary: true }) })
+    await api(`${base}/${guardian.id}`, { method: 'PUT', body: JSON.stringify({ full_name: guardian.full_name, relationship: guardian.relationship, phone: guardian.phone, email: guardian.email, is_primary: true }) })
     await refreshAll()
   }, t('guardian.saved'))
   const remove = (guardian: Guardian) => {
@@ -154,6 +154,7 @@ function Guardians({ studentID, guardians, canEdit, path }: { studentID: string;
                 <button className="secondary compact" onClick={() => setEditing(guardian.id)}>{t('guardian.edit')}</button>
                 <button className="secondary compact" disabled={busy} onClick={() => remove(guardian)}>{t('guardian.remove')}</button>
               </div>}
+              <ParentAccess studentID={studentID} guardian={guardian} canEdit={canEdit} refreshAll={refreshAll} />
             </>}
       </li>)}
       {!guardians.length && <li className="empty">{t('guardian.empty')}</li>}
@@ -164,6 +165,54 @@ function Guardians({ studentID, guardians, canEdit, path }: { studentID: string;
       <button className="primary compact" disabled={busy}>{t('guardian.add')}</button>
     </form>}
   </section>
+}
+
+// ParentAccess lets an administrator give a guardian a parent portal account, and
+// take it away. A teacher only sees whether one exists.
+function ParentAccess({ studentID, guardian, canEdit, refreshAll }: { studentID: string; guardian: Guardian; canEdit: boolean; refreshAll: () => Promise<unknown> }) {
+  const { t } = useI18n()
+  const { setNotice, setError } = useFeedback()
+  const { busy, run, onSubmit } = useAction()
+  const [link, setLink] = useState<{ title: string; detail: string; url: string; copied: string } | null>(null)
+  const base = `/students/${studentID}/guardians/${guardian.id}`
+  const invite = onSubmit(async (f) => {
+    const result = await api<{ linked: boolean; token?: string }>(`${base}/invitation`, { method: 'POST', body: JSON.stringify({ email: f.get('email') }) })
+    await refreshAll()
+    if (result.linked) {
+      setLink(null)
+      setNotice(t('guardian.linked'))
+      return
+    }
+    setLink({ title: t('guardian.inviteLinkFor', { name: guardian.full_name }), detail: t('guardian.inviteLinkDetail'), url: `${window.location.origin}/#parent-invite=${encodeURIComponent(result.token ?? '')}`, copied: t('guardian.inviteCopied') })
+    setNotice(t('guardian.inviteCreated'))
+  }, undefined, false)
+  const reset = () => run(async () => {
+    const result = await api<{ token: string }>(`${base}/password-reset`, { method: 'POST', body: '{}' })
+    setLink({ title: t('account.resetLinkFor', { name: guardian.full_name }), detail: t('account.resetLinkDetail'), url: passwordResetLink(result.token), copied: t('account.resetLinkCopied') })
+  })
+  const removeAccess = () => {
+    if (!window.confirm(t('guardian.removeAccessConfirm', { name: guardian.full_name }))) return
+    void run(async () => {
+      await api(`${base}/account`, { method: 'DELETE' })
+      await refreshAll()
+      setLink(null)
+    }, t('guardian.accessRemoved'))
+  }
+  if (!canEdit) return guardian.has_account ? <span className="status-pill">{t('guardian.hasAccount')}</span> : null
+  return <div className="guardian-access">
+    {guardian.has_account
+      ? <div className="operation-actions">
+          <span className="status-pill">{t('guardian.hasAccount')}</span>
+          <button className="secondary compact" disabled={busy} onClick={() => void reset()}>{t('students.resetPassword')}</button>
+          <button className="secondary compact" disabled={busy} onClick={removeAccess}>{t('guardian.removeAccess')}</button>
+        </div>
+      : <form className="inline-form" onSubmit={invite}>
+          <input name="email" type="email" defaultValue={guardian.email} placeholder={t('guardian.accountEmail')} aria-label={t('guardian.accountEmailFor', { name: guardian.full_name })} required />
+          <button className="secondary compact" disabled={busy}>{guardian.invite_pending ? t('guardian.inviteAgain') : t('guardian.invite')}</button>
+          {guardian.invite_pending && <span className="status-pill draft">{t('guardian.invitePending')}</span>}
+        </form>}
+    {link && <CopyLinkResult title={link.title} detail={link.detail} link={link.url} onCopied={() => setNotice(link.copied)} onCopyFailed={() => setError(t('common.copyFailed'))} />}
+  </div>
 }
 
 function MoveClass({ studentID, currentClass, path }: { studentID: string; currentClass: string; path: string }) {

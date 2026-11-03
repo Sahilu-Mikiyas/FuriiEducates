@@ -17,6 +17,10 @@
       "destination": "/"
     },
     {
+      "source": "/family/:path*",
+      "destination": "/"
+    },
+    {
       "source": "/login",
       "destination": "/"
     }

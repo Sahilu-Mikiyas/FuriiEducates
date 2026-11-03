@@ -442,6 +442,47 @@ paths:
       responses:
         '200': { description: Success }
         '401': { description: Authentication required }
+  /students/{studentID}/guardians/{guardianID}/invitation:
+    post:
+      summary: "Give a guardian portal access: links an existing account in the school, or returns a one-time invitation token (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /students/{studentID}/guardians/{guardianID}/password-reset:
+    post:
+      summary: "Create a password reset link for a guardian's account (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /students/{studentID}/guardians/{guardianID}/account:
+    delete:
+      summary: "Remove a guardian's portal access to this student (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /parent/children:
+    get:
+      summary: "The children linked to this parent, with a short summary"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /parent/children/{studentID}:
+    get:
+      summary: "One linked child's attendance, published report cards, fees and exam readiness"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /guardian-invitations/accept:
+    post:
+      summary: "Create a parent account from an invitation. Accepts every invitation waiting for the same email"
+      responses:
+        '201': { description: Account created }
+        '400': { description: Invitation invalid or expired }
   /demo-requests:
     post:
       summary: Submit a public school setup request

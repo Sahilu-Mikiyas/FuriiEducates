@@ -58,6 +58,8 @@ type guardianRow struct {
 	Phone        string `json:"phone"`
 	Email        string `json:"email"`
 	IsPrimary    bool   `json:"is_primary"`
+	HasAccount   bool   `json:"has_account"`
+	Pending      bool   `json:"invite_pending"`
 }
 
 func (a *API) getStudentProfile(w http.ResponseWriter, r *http.Request, id auth.Identity) {
@@ -96,7 +98,9 @@ func (a *API) getStudentProfile(w http.ResponseWriter, r *http.Request, id auth.
 		a.databaseError(w, r, err)
 		return
 	}
-	rows, err := a.db.Query(r.Context(), `SELECT id::text,full_name,relationship,phone,COALESCE(email,''),is_primary FROM guardians WHERE student_id=$1 AND school_id=$2 ORDER BY is_primary DESC,created_at`, studentID, id.SchoolID)
+	rows, err := a.db.Query(r.Context(), `SELECT g.id::text,g.full_name,g.relationship,g.phone,COALESCE(g.email,''),g.is_primary,g.user_id IS NOT NULL,
+		EXISTS(SELECT 1 FROM guardian_invitations i WHERE i.guardian_id=g.id AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>now())
+		FROM guardians g WHERE g.student_id=$1 AND g.school_id=$2 ORDER BY g.is_primary DESC,g.created_at`, studentID, id.SchoolID)
 	if err != nil {
 		a.serverError(w, r, err)
 		return
@@ -105,7 +109,7 @@ func (a *API) getStudentProfile(w http.ResponseWriter, r *http.Request, id auth.
 	guardians := []guardianRow{}
 	for rows.Next() {
 		var x guardianRow
-		if err = rows.Scan(&x.ID, &x.FullName, &x.Relationship, &x.Phone, &x.Email, &x.IsPrimary); err != nil {
+		if err = rows.Scan(&x.ID, &x.FullName, &x.Relationship, &x.Phone, &x.Email, &x.IsPrimary, &x.HasAccount, &x.Pending); err != nil {
 			a.serverError(w, r, err)
 			return
 		}

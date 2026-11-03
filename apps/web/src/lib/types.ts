@@ -24,7 +24,19 @@ export type ReportCardData = {
 }
 export type ReportProblem = { kind: 'no_items' | 'weights' | 'missing_marks'; subject_id: string; subject: string; weight_total?: number; missing_marks?: number }
 export type ClassReportData = { published: boolean; published_at: string; cards: ReportCardData[]; problems: ReportProblem[] }
-export type Guardian = { id: string; full_name: string; relationship: string; phone: string; email: string; is_primary: boolean }
+export type ChildStudent = { id: string; student_number: string; legal_name: string; status: string; stream: string; class_name: string; grade_level: string }
+export type ChildSummary = ChildStudent & { attendance: AttendanceSummaryData; latest_term: string; latest_average: number | null; latest_rank: number | null; students_ranked: number }
+export type ChildData = {
+  student: ChildStudent
+  attendance: AttendanceSummaryData
+  report_cards: ReportCardData[]
+  fees: {
+    balances: { currency_code: string; charged_minor: number; paid_minor: number; due_minor: number }[]
+    entries: { entry_type: string; category: string; description: string; amount_minor: number; currency_code: string; due_on: string | null; paid_on: string | null; recorded_on: string }[]
+  }
+  readiness: (ReadinessEstimate & { weak_topics: TopicStat[] }) | null
+}
+export type Guardian = { id: string; full_name: string; relationship: string; phone: string; email: string; is_primary: boolean; has_account: boolean; invite_pending: boolean }
 export type AttendanceSummaryData = { days_marked: number; present: number; absent: number; late: number; excused: number; recent: { date: string; status: string; note: string }[] }
 export type StudentProfileData = {
   student: { id: string; student_number: string; legal_name: string; date_of_birth: string; gender: string; preferred_language: string; address: string; medical_notes: string; stream: string; status: string; has_account: boolean; class_id: string; class_name: string; grade_level: string }
