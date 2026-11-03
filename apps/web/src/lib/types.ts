@@ -24,6 +24,14 @@ export type ReportCardData = {
 }
 export type ReportProblem = { kind: 'no_items' | 'weights' | 'missing_marks'; subject_id: string; subject: string; weight_total?: number; missing_marks?: number }
 export type ClassReportData = { published: boolean; published_at: string; cards: ReportCardData[]; problems: ReportProblem[] }
+export type LearningTopic = { skill_id: string; title: string; subject: string; paper: string; percent: number; responses: number; can_practice: boolean }
+export type LearningSubject = { name: string; total: number; change: number | null; below_pass: boolean; topics: LearningTopic[] }
+export type LearningAction = { type: 'assignment' | 'resume' | 'practice' | 'review' | 'resource'; title?: string; subject?: string; paper?: string; skill_id?: string; assignment_id?: string; resource_id?: string; session_id?: string; due_at?: string; count?: number }
+export type LearningPlanData = {
+  report_term: string; going_well: LearningSubject[]; room_to_improve: LearningSubject[]; strong_topics: LearningTopic[]; weak_topics: LearningTopic[]
+  attendance: { days_marked: number; days_absent: number; current_streak: number; reason: string } | null
+  next: LearningAction[]; has_evidence: boolean; min_responses: number
+}
 export type ChildStudent = { id: string; student_number: string; legal_name: string; status: string; stream: string; class_name: string; grade_level: string }
 export type ChildSummary = ChildStudent & { attendance: AttendanceSummaryData; latest_term: string; latest_average: number | null; latest_rank: number | null; students_ranked: number }
 export type ChildData = {
@@ -35,6 +43,7 @@ export type ChildData = {
     entries: { entry_type: string; category: string; description: string; amount_minor: number; currency_code: string; due_on: string | null; paid_on: string | null; recorded_on: string }[]
   }
   readiness: (ReadinessEstimate & { weak_topics: TopicStat[] }) | null
+  learning_plan: LearningPlanData
 }
 export type Guardian = { id: string; full_name: string; relationship: string; phone: string; email: string; is_primary: boolean; has_account: boolean; invite_pending: boolean }
 export type AttendanceSummaryData = { days_marked: number; present: number; absent: number; late: number; excused: number; recent: { date: string; status: string; note: string }[] }

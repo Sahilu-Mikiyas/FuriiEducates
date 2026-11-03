@@ -7,9 +7,10 @@ import { useDates } from '../../calendar/useDates'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { useClasses, useRefresh } from '../../lib/queries'
-import { classLabel, Guardian, StudentProfileData } from '../../lib/types'
+import { classLabel, Guardian, LearningPlanData, StudentProfileData } from '../../lib/types'
 import { CopyLinkResult, passwordResetLink } from '../account/account'
 import { AttendanceSummary } from '../attendance/AttendanceSummary'
+import { LearningPlan } from '../learning/LearningPlan'
 
 const RELATIONSHIPS = ['mother', 'father', 'guardian', 'other']
 
@@ -40,8 +41,20 @@ export default function StudentProfile({ canEdit, base }: { canEdit: boolean; ba
     {canEdit ? <ProfileForm key={JSON.stringify(student)} path={path} student={student} /> : <ProfileDetails student={student} />}
     <Guardians studentID={studentID} guardians={guardians} canEdit={canEdit} path={path} />
     {canEdit && <MoveClass studentID={studentID} currentClass={student.class_id} path={path} />}
+    <LearningSummary studentID={studentID} />
     <AttendanceSummary summary={attendance} />
   </div>
+}
+
+function LearningSummary({ studentID }: { studentID: string }) {
+  const { t } = useI18n()
+  const path = `/students/${studentID}/learning-plan`
+  const plan = useQuery({ queryKey: [path], queryFn: () => api<LearningPlanData>(path), meta: { silent: true } }).data
+  if (!plan) return null
+  return <section className="panel">
+    <div className="panel-head"><div><h2>{t('learning.staffTitle')}</h2><p>{t('learning.staffHelp')}</p></div></div>
+    <LearningPlan plan={plan} readOnly />
+  </section>
 }
 
 function ProfileDetails({ student }: { student: StudentProfileData['student'] }) {

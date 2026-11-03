@@ -427,5 +427,10 @@ func (a *API) getChild(w http.ResponseWriter, r *http.Request, id auth.Identity)
 			return
 		}
 	}
-	writeJSON(w, 200, map[string]any{"data": map[string]any{"student": child, "attendance": attendance, "report_cards": cards, "fees": fees, "readiness": readiness}})
+	plan, err := a.buildLearningPlan(r.Context(), id.SchoolID, studentID)
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"data": map[string]any{"student": child, "attendance": attendance, "report_cards": cards, "fees": fees, "readiness": readiness, "learning_plan": plan}})
 }

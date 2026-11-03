@@ -483,6 +483,20 @@ paths:
       responses:
         '201': { description: Account created }
         '400': { description: Invitation invalid or expired }
+  /student/learning-plan:
+    get:
+      summary: "The student's plan: what is going well, most room to improve, and what to do next"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /students/{studentID}/learning-plan:
+    get:
+      summary: "The same plan for an administrator or a teacher of the student's class"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
   /demo-requests:
     post:
       summary: Submit a public school setup request

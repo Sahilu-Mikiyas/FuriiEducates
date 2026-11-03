@@ -126,7 +126,18 @@ Limits: the default grade bands have not been checked against Ministry or region
 
 Limits: nothing is sent to parents, so they must open the portal, and no SMS goes out until a provider is chosen. Sign-in needs an email address, which not every parent has, so sign-in by phone should come with SMS. Invitation links are copied and shared by staff. Parents cannot message the school, see marks before publishing, or see day-to-day learning such as assignments. Attendance reasons and fee descriptions that staff type are now visible to families.
 
-Next: choose an SMS provider, and decide whether a student learning plan and assignments come next.
+**2026-11-03 — My learning built.**
+
+- A student's home page now opens on one plan: what is going well, where there is most room to improve, and what to do next. Parents see the same plan, and so do administrators and the teachers of the student's class, on the student's profile. Only the student can act on it.
+- Subjects come from the latest published report card, with the change since the term before. Nothing below the pass mark is called going well, and the plan says nothing when every subject scored the same. Unpublished marks stay out.
+- Topics come from online tests and exam practice, using the same mastery estimate shown lower on the page, which holds back until there is enough evidence. A topic needs at least 5 answers before the plan mentions it, so one bad quiz does not label a student. At 75% or more it is going well, and below 65% it has room to improve, the same line recommendations use. A weak topic sits under its subject where the names match, as "Physics, especially Motion".
+- Next steps are real things to open, in this order: unfinished practice, tests the school has set that can be taken now with the nearest deadline first, practice on the weakest topics, class files for those subjects, then questions due for another try. Tests not yet open, past their deadline, or waiting for an invigilator are left out.
+- Attendance is mentioned when it needs attention, using the same rule as the office's alerts, and when a student has no absences.
+- It uses rules, not AI, so every line can be traced to marks or answers. It compares a student only with themself. New API tests cover all of this, and the whole flow ran in Edge against a production build, in English and Amharic and at phone width.
+
+Limits: most schools will see little here until they have published a report card or students have answered enough tagged questions, since typed marks say nothing about topics. Subject and topic names are matched by spelling, so a file or topic under another spelling, or a subject named in Amharic, is not connected. Files are suggested by subject only and the plan cannot tell whether a student opened one. Practice is offered only for national exam papers. Teachers still cannot set their own online tests or assignments. The older recommendations panel still sits lower on the page, and its text is stored in English, so it stays in English on Amharic screens.
+
+Next: teacher-made quizzes and assignments. SMS and phone sign-in still wait on choosing a provider.
 
 ---
 

@@ -3,13 +3,13 @@ import { Link, Navigate, useParams } from 'react-router'
 import { useDates } from '../../calendar/useDates'
 import { ChangePasswordPanel, PreferencesPanel } from '../../features/account/account'
 import { AttendanceSummary } from '../../features/attendance/AttendanceSummary'
-import { SubjectInsight, subjectInsights } from '../../features/parent/insights'
+import { LearningPlan } from '../../features/learning/LearningPlan'
 import { PaperBars, TotalBadge, usePaperName } from '../../features/prep/readiness'
 import { ReportCardView, usePrint } from '../../features/reports/ReportCard'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { money } from '../../lib/money'
-import { ChildData, ChildSummary, classLabel, ReportCardData } from '../../lib/types'
+import { ChildData, ChildSummary, classLabel, LearningPlanData, ReportCardData } from '../../lib/types'
 
 export function ParentAccountPage() {
   return <><PreferencesPanel /><ChangePasswordPanel /></>
@@ -37,24 +37,10 @@ export function ParentHome() {
   </>
 }
 
-function Change({ change }: { change: number | null }) {
+// HowTheyAreDoing shows the latest published figures and the child's learning
+// plan, which compares them only with themself.
+function HowTheyAreDoing({ card, name, plan }: { card: ReportCardData; name: string; plan: LearningPlanData }) {
   const { t } = useI18n()
-  if (change === null || change === 0) return null
-  return <small className={change > 0 ? 'insight-up' : 'insight-down'}>{change > 0 ? t('parent.up', { n: change }) : t('parent.down', { n: -change })}</small>
-}
-
-function InsightList({ title, items, tone }: { title: string; items: SubjectInsight[]; tone: string }) {
-  return <div className={`insight-group ${tone}`}>
-    <h3>{title}</h3>
-    <ul>{items.map((item) => <li key={item.name}><span>{item.name}</span><strong>{item.total}</strong><Change change={item.change} /></li>)}</ul>
-  </div>
-}
-
-// HowTheyAreDoing sums up the latest published card. It describes the marks and
-// compares the child only with themself.
-function HowTheyAreDoing({ card, name }: { card: ReportCardData; name: string }) {
-  const { t } = useI18n()
-  const { best, focus } = subjectInsights(card)
   return <section className="panel">
     <div className="panel-head"><div><h2>{t('parent.doingTitle', { name })}</h2><p>{t('parent.doingHelp', { term: card.term_name })}</p></div></div>
     <div className="attendance-counts child-figures">
@@ -62,10 +48,7 @@ function HowTheyAreDoing({ card, name }: { card: ReportCardData; name: string })
       <div className="attendance-count"><strong>{card.grade || '—'}</strong><span>{t('reports.grade')}</span></div>
       <div className="attendance-count"><strong>{card.rank ? t('reports.rankOf', { rank: card.rank, n: card.students_ranked }) : '—'}</strong><span>{t('reports.rank')}</span></div>
     </div>
-    {best.length > 0 && <div className="insights">
-      <InsightList title={t('parent.doingBest')} items={best} tone="best" />
-      <InsightList title={t('parent.mostRoom')} items={focus} tone="focus" />
-    </div>}
+    <LearningPlan plan={plan} readOnly />
   </section>
 }
 
@@ -127,7 +110,7 @@ export function ChildPage() {
   const others = useQuery({ queryKey: [CHILDREN_PATH], queryFn: () => api<ChildSummary[]>(CHILDREN_PATH) }).data ?? []
   if (query.error) return <section className="panel"><p className="row-error">{errorText(query.error, 'error.load')}</p></section>
   if (!query.data) return <p className="empty">{t('common.loading')}</p>
-  const { student, attendance, report_cards: cards, fees, readiness } = query.data
+  const { student, attendance, report_cards: cards, fees, readiness, learning_plan: plan } = query.data
   const firstName = student.legal_name.split(' ')[0]
   return <>
     <div className="learner-welcome">
@@ -137,8 +120,8 @@ export function ChildPage() {
     </div>
     <div className="operations-page">
       {cards.length > 0
-        ? <HowTheyAreDoing card={cards[0]} name={firstName} />
-        : <section className="panel"><div className="panel-head"><div><h2>{t('parent.doingTitle', { name: firstName })}</h2></div></div><p className="empty">{t('parent.noReportYet')}</p></section>}
+        ? <HowTheyAreDoing card={cards[0]} name={firstName} plan={plan} />
+        : <section className="panel"><div className="panel-head"><div><h2>{t('parent.doingTitle', { name: firstName })}</h2></div></div>{plan.has_evidence ? <LearningPlan plan={plan} readOnly /> : <p className="empty">{t('parent.noReportYet')}</p>}</section>}
       <AttendanceSummary summary={attendance} />
       {readiness && <Readiness readiness={readiness} />}
       {cards.map((card) => <section className="panel" key={card.term_id}>

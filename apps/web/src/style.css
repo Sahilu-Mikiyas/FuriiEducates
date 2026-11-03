@@ -539,6 +539,15 @@ footer span{color:#1d4ed8}
 .insight-group small{flex:1 1 100%;font-size:11px}
 .insight-up{color:#15803d}
 .insight-down{color:#b91c1c}
+/* Learning plan */
+.learning-note{margin:12px 0 0}
+.learning-good{margin:12px 0 0;color:#15803d;font-size:13px}
+.next-steps ul{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:0;padding:0;list-style:none}
+.next-step{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;padding:10px 12px;border:1px solid #e3e6e4;border-radius:8px}
+.next-step>div{display:grid;flex:1 1 200px;gap:2px;min-width:0;font-size:13px;overflow-wrap:anywhere}
+.next-step small{color:#666;font-size:12px}
+.next-step a.secondary{text-decoration:none}
+.learning-source{margin:12px 0 0}
 @page roster{size:A4 landscape;margin:10mm}
 @media print{
   body>:not(.print-root){display:none!important}

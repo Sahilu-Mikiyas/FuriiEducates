@@ -2,11 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useAction } from '../../app/feedback'
 import { useSession } from '../../app/session'
 import { AttendanceSummary } from '../../features/attendance/AttendanceSummary'
+import { LearningPlan } from '../../features/learning/LearningPlan'
 import { StudentResources } from '../../features/operations/Resources'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { useRefresh } from '../../lib/queries'
-import type { AttendanceSummaryData, StudentLearningProfile } from '../../lib/types'
+import type { AttendanceSummaryData, LearningPlanData, StudentLearningProfile } from '../../lib/types'
 
 const PROFILE_PATH = '/student/learning-profile'
 
@@ -16,6 +17,7 @@ export default function LearnerHome() {
   const { busy, run } = useAction()
   const refresh = useRefresh()
   const profile = useQuery({ queryKey: [PROFILE_PATH], queryFn: () => api<StudentLearningProfile>(PROFILE_PATH) }).data
+  const plan = useQuery({ queryKey: ['/student/learning-plan'], queryFn: () => api<LearningPlanData>('/student/learning-plan'), staleTime: 0, refetchOnMount: 'always' }).data
   const attendance = useQuery({ queryKey: ['/student/attendance'], queryFn: () => api<AttendanceSummaryData>('/student/attendance') }).data
   const change = (id: string, action: 'accept' | 'complete') => run(async () => {
     await api(`/student/recommendations/${id}/${action}`, { method: 'POST', body: '{}' })
@@ -25,8 +27,12 @@ export default function LearnerHome() {
     <div className="learner-welcome">
       <p className="eyebrow">{t('learner.eyebrow')}</p>
       <h1>{t('learner.welcome', { name: identity?.display_name.split(' ')[0] ?? '' })}</h1>
-      <p className="muted">{t('learner.welcomeHelp')}</p>
+      <p className="muted">{t('learning.help')}</p>
     </div>
+    {plan && <section className="panel learning-plan">
+      <div className="panel-head"><div><h2>{t('learning.title')}</h2></div></div>
+      <LearningPlan plan={plan} />
+    </section>}
     {profile && <>
       <section className="panel mastery-panel">
         <div className="panel-head">
