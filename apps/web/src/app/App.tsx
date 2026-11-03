@@ -21,6 +21,7 @@ const StudentsPage = lazy(() => import('../pages/admin/StudentsPage'))
 const AttendancePage = lazy(() => import('../pages/admin/AttendancePage'))
 const StudentProfile = lazy(() => import('../features/students/StudentProfile'))
 const ReportSetupPage = lazy(() => import('../pages/admin/ReportSetupPage'))
+const AdminQuizzesPage = lazy(() => import('../pages/admin/MarksPage').then((m) => ({ default: m.AdminQuizzesPage })))
 const AdminMarksPage = lazy(() => import('../pages/admin/MarksPage').then((m) => ({ default: m.AdminMarksPage })))
 const AdminReportCardsPage = lazy(() => import('../pages/admin/MarksPage').then((m) => ({ default: m.AdminReportCardsPage })))
 const ClassesPage = lazy(() => import('../pages/admin/ClassesPage'))
@@ -37,6 +38,7 @@ const MockDaysPage = lazy(() => import('../features/prep/MockDays').then((m) => 
 const TeacherLayout = lazy(() => import('../pages/teacher/TeacherLayout'))
 const ClassPage = lazy(() => import('../pages/teacher/ClassPage'))
 const TeacherAttendancePage = lazy(() => import('../pages/teacher/AttendancePage'))
+const TeacherQuizzesPage = lazy(() => import('../pages/teacher/MarksPages').then((m) => ({ default: m.TeacherQuizzesPage })))
 const TeacherMarksPage = lazy(() => import('../pages/teacher/MarksPages').then((m) => ({ default: m.TeacherMarksPage })))
 const TeacherReportCardsPage = lazy(() => import('../pages/teacher/MarksPages').then((m) => ({ default: m.TeacherReportCardsPage })))
 const teacherPage = (name: 'TeacherReadinessPage' | 'TeacherSessionsPage' | 'TeacherGradebookPage' | 'TeacherAnswersPage' | 'TeacherPlanningPage' | 'TeacherAccountPage') =>
@@ -127,6 +129,7 @@ export function App() {
         <Route path="mock-days" element={<MockDaysPage />} />
         <Route path="exam-sessions" element={<ExamSessions />} />
         <Route path="results" element={<ResultsPage />} />
+        <Route path="quizzes" element={<AdminQuizzesPage />} />
         <Route path="marks" element={<AdminMarksPage />} />
         <Route path="report-cards" element={<AdminReportCardsPage />} />
         <Route path="report-setup" element={<ReportSetupPage />} />
@@ -141,6 +144,7 @@ export function App() {
         <Route index element={<Navigate to="class" replace />} />
         <Route path="class" element={<ClassPage />} />
         <Route path="attendance" element={<TeacherAttendancePage />} />
+        <Route path="quizzes" element={<TeacherQuizzesPage />} />
         <Route path="marks" element={<TeacherMarksPage />} />
         <Route path="report-cards" element={<TeacherReportCardsPage />} />
         <Route path="students/:studentID" element={<StudentProfile canEdit={false} base="/teach" />} />

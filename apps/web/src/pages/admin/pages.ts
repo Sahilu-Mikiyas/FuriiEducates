@@ -12,6 +12,7 @@ export const adminPages = [
   { id: 'exam-questions', icon: '☰' },
   { id: 'mock-days', icon: '◷' },
   { id: 'results', icon: '▥' },
+  { id: 'quizzes', icon: '✓' },
   { id: 'marks', icon: '✐' },
   { id: 'report-cards', icon: '▨' },
   { id: 'report-setup', icon: '⚖' },

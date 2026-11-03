@@ -548,6 +548,35 @@ footer span{color:#1d4ed8}
 .next-step small{color:#666;font-size:12px}
 .next-step a.secondary{text-decoration:none}
 .learning-source{margin:12px 0 0}
+/* Teacher quizzes and assignments */
+.profile-form .check-row{display:flex;align-items:center;gap:8px;font-weight:400}
+.profile-form .check-row input{flex:none;width:18px;min-height:18px;margin:0}
+td>strong+small{display:block;color:#666;font-size:11px}
+.quiz-question .panel-head h3{margin:0;font-size:14px}
+.quiz-checks{display:grid;gap:8px;align-self:end}
+.quiz-upload{margin-top:12px}
+.quiz-options{display:grid;gap:8px;min-width:0;margin:0;padding:0;border:0}
+.quiz-options legend{padding:0;margin-bottom:6px;color:#41534b;font-size:12px;font-weight:600}
+.quiz-option{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px}
+.quiz-option input[type=radio]{width:18px;min-height:18px;margin:0}
+.quiz-options>.secondary{justify-self:start}
+.quiz-foot{position:static;margin-top:0;padding:0}
+.quiz-topics{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin:0;padding:0;list-style:none}
+.quiz-topics li{display:grid;grid-template-columns:minmax(90px,200px) minmax(0,1fr) auto;align-items:center;gap:10px;font-size:13px}
+.quiz-topics span{overflow-wrap:anywhere}
+.quiz-prompt-cell{min-width:180px;max-width:420px;overflow-wrap:anywhere}
+.quiz-takeback{margin-top:12px}
+.quiz-worksheet{margin:0 0 12px;font-size:14px}
+.quiz-review-item{padding:12px 0;border-top:1px solid #ececec;font-size:14px;overflow-wrap:anywhere}
+.quiz-review-item:first-of-type{border-top:0;padding-top:0}
+.quiz-review-item p{margin:6px 0 0}
+.attendance-tag.present{background:#ecfdf3;color:#15803d}
+.attendance-range label{display:grid;gap:4px;min-width:0;color:#41534b;font-size:12px;font-weight:600}
+.attendance-range label input{width:100%;min-height:38px;padding:7px 10px;border:1px solid #d9dedb;border-radius:6px;background:#fff;font:inherit;font-size:13px;font-weight:400}
+@media(max-width:700px){
+  .quiz-topics li{grid-template-columns:minmax(0,1fr) auto}
+  .quiz-topics .mastery-bar{grid-column:1/-1;grid-row:2}
+}
 @page roster{size:A4 landscape;margin:10mm}
 @media print{
   body>:not(.print-root){display:none!important}

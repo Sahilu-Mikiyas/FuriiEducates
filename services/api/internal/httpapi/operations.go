@@ -29,7 +29,7 @@ func (a *API) registerOperationsRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/v1/teacher/lesson-plans/{planID}", a.teacher(a.saveLessonPlan))
 	mux.HandleFunc("GET /api/v1/lesson-plans", a.admin(a.listSchoolLessonPlans))
 	mux.HandleFunc("PATCH /api/v1/lesson-plans/{planID}/review", a.admin(a.reviewLessonPlan))
-	mux.HandleFunc("GET /api/v1/teacher/classes/{classID}/resources", a.teacher(a.listClassResources))
+	mux.HandleFunc("GET /api/v1/teacher/classes/{classID}/resources", a.staffMember(a.listClassResources))
 	mux.HandleFunc("POST /api/v1/teacher/classes/{classID}/resources", a.teacher(a.uploadClassResource))
 	mux.HandleFunc("GET /api/v1/student/resources", a.student(a.listStudentResources))
 	mux.HandleFunc("GET /api/v1/resources/{resourceID}/download", a.authenticated(a.downloadResource))

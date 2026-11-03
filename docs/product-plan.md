@@ -161,7 +161,7 @@ Status key: **Exists**, **Partial**, **New**. Each module lists the operations a
   - chronic-absence alerts;
   - monthly attendance reports.
 
-### 3.6 Teaching and learning (Partial)
+### 3.6 Teaching and learning (Partial: lesson plans, class files, teacher quizzes and assignments with worksheets and online answers are built; photo hand-ins and coverage reports are not)
 - **Operations:** lesson plans (exists), class resources (exists), homework and assignments, submissions, feedback, curriculum coverage tracking, department planning.
 - **Automate:** homework reminders, late-submission tracking, coverage reports comparing plans to the syllabus, and copying plans to the next year.
 

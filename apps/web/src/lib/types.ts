@@ -24,6 +24,15 @@ export type ReportCardData = {
 }
 export type ReportProblem = { kind: 'no_items' | 'weights' | 'missing_marks'; subject_id: string; subject: string; weight_total?: number; missing_marks?: number }
 export type ClassReportData = { published: boolean; published_at: string; cards: ReportCardData[]; problems: ReportProblem[] }
+export type QuizQuestion = { question_type: 'single_choice' | 'numeric' | 'text'; prompt: string; options: string[]; correct: number; value: number | null; tolerance: number; guide: string; topic: string; points: number; explanation: string }
+export type QuizRow = { id: string; title: string; kind: 'quiz' | 'assignment'; status: string; subject: string; class_subject_id: string; duration_minutes: number; assignment_id: string; opens_at: string | null; due_at: string | null; question_count: number; total_points: number; students: number; submitted: number; waiting_review: number; average_percent: number | null; in_marks: boolean; can_edit: boolean }
+export type QuizData = { id: string; class_subject_id: string; subject: string; title: string; kind: 'quiz' | 'assignment'; status: string; instructions: string; duration_minutes: number; resource_id: string; show_answers: boolean; shuffle: boolean; attempts: number; can_edit: boolean; questions: QuizQuestion[] }
+export type QuizResults = {
+  title: string; kind: 'quiz' | 'assignment'; assignment_id: string; can_edit: boolean
+  students: { student_id: string; student_number: string; student_name: string; status: string; submitted_at: string | null; results_released: boolean; final_score: number | null; final_max_score: number | null; auto_score: number | null; auto_max_score: number | null }[]
+  questions: { position: number; prompt: string; question_type: string; topic: string; points: number; answers_marked: number; percent: number | null }[]
+  topics: { topic: string; percent: number }[]
+}
 export type LearningTopic = { skill_id: string; title: string; subject: string; paper: string; percent: number; responses: number; can_practice: boolean }
 export type LearningSubject = { name: string; total: number; change: number | null; below_pass: boolean; topics: LearningTopic[] }
 export type LearningAction = { type: 'assignment' | 'resume' | 'practice' | 'review' | 'resource'; title?: string; subject?: string; paper?: string; skill_id?: string; assignment_id?: string; resource_id?: string; session_id?: string; due_at?: string; count?: number }
@@ -74,8 +83,8 @@ export type Assessment = { id: string; title: string; instructions: string; stat
 export type LearningSummary = { assigned_assessments: number; submitted_attempts: number; average_score_percent: number; active_recommendations: number }
 
 export type LearnerAssignment = { assignment_id: string; title: string; instructions: string; class_name: string; grade_level: string; assigned_at: string; due_at: string; attempt_status: string; attempt_id: string }
-export type LearnerQuestion = { id: string; question_type: string; prompt: { text?: string }; options?: { id: string; text: string }[]; points: string; answer?: unknown; revision: number; flagged: boolean; awarded_points?: string; feedback?: string }
-export type LearnerAssessment = { assignment_id: string; title: string; instructions: string; status: string; attempt_id: string; deadline_at: string | null; score: number | null; max_score: number | null; results_released: boolean; final_score: number | null; final_max_score: number | null; manual_review_count: number; question_count: number; duration_minutes: number; requires_start_code: boolean; session_open: boolean; locked_mode: boolean; national_paper?: string | null; opens_at: string | null; due_at: string | null; not_open_yet: boolean; past_due: boolean; questions: LearnerQuestion[] }
+export type LearnerQuestion = { id: string; question_type: string; prompt: { text?: string }; options?: { id: string; text: string }[]; points: string; answer?: unknown; revision: number; flagged: boolean; correct_answer?: unknown; is_correct?: boolean; explanation?: string; awarded_points?: string; feedback?: string }
+export type LearnerAssessment = { kind?: string; resource_id?: string; resource_title?: string; answers_after_due?: boolean; assignment_id: string; title: string; instructions: string; status: string; attempt_id: string; deadline_at: string | null; score: number | null; max_score: number | null; results_released: boolean; final_score: number | null; final_max_score: number | null; manual_review_count: number; question_count: number; duration_minutes: number; requires_start_code: boolean; session_open: boolean; locked_mode: boolean; national_paper?: string | null; opens_at: string | null; due_at: string | null; not_open_yet: boolean; past_due: boolean; questions: LearnerQuestion[] }
 export type StudentLearningProfile = {
   algorithm_version: string
   skills: { skill_id: string; title: string; estimated_mastery: number; confidence: number; evidence_count: number; confidence_band: string }[]

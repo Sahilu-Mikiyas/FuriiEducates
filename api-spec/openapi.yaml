@@ -497,6 +497,80 @@ paths:
       responses:
         '200': { description: Success }
         '401': { description: Authentication required }
+  /quizzes:
+    get:
+      summary: "A class's quizzes and assignments, by class_id (administrator or teacher of the class)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    post:
+      summary: "Write a draft quiz or assignment (administrator or the subject's teacher)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /quizzes/topics:
+    get:
+      summary: "Topics already used in a subject, by class_subject_id"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /quizzes/{quizID}:
+    get:
+      summary: "A quiz with its answers (administrator or teacher of the class)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    put:
+      summary: "Replace a draft (administrator or the subject's teacher)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    delete:
+      summary: "Remove a quiz nobody has started (administrator or the subject's teacher)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /quizzes/{quizID}/publish:
+    post:
+      summary: "Publish to the class, with opens_at and due_at. An assignment needs due_at, within 30 days"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /quizzes/{quizID}/schedule:
+    put:
+      summary: "Change the due date, including for work under way"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /quizzes/{quizID}/copy:
+    post:
+      summary: "Copy as a draft to another class's subject, without the worksheet"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /quizzes/{quizID}/results:
+    get:
+      summary: "Results by student, question and topic. Unmarked written work stays out of the figures"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /quizzes/{quizID}/send-to-marks:
+    post:
+      summary: "Copy released scores into the subject's marks as one test for a term. Sending again updates it"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
   /demo-requests:
     post:
       summary: Submit a public school setup request

@@ -81,7 +81,7 @@ func (a *API) listExamSessions(w http.ResponseWriter, r *http.Request, id auth.I
 		FROM assessment_assignments aa
 		JOIN assessments a ON a.id=aa.assessment_id AND a.school_id=aa.school_id
 		JOIN classes c ON c.id=aa.class_id AND c.school_id=aa.school_id
-		WHERE aa.school_id=$1 AND ($2 OR EXISTS(SELECT 1 FROM class_teachers ct WHERE ct.class_id=aa.class_id AND ct.school_id=aa.school_id AND ct.teacher_id=$3))
+		WHERE aa.school_id=$1 AND a.kind='exam' AND ($2 OR EXISTS(SELECT 1 FROM class_teachers ct WHERE ct.class_id=aa.class_id AND ct.school_id=aa.school_id AND ct.teacher_id=$3))
 		ORDER BY aa.assigned_at DESC LIMIT 200`, id.SchoolID, hasRole(id.Roles, "school_admin"), id.UserID)
 	if err != nil {
 		a.serverError(w, r, err)

@@ -258,6 +258,10 @@ type studentAssignmentView struct {
 	DueAt             *string
 	NotOpenYet        bool
 	PastDue           bool
+	Kind              string
+	ResourceID        string
+	ResourceTitle     string
+	ShowAnswers       bool
 }
 
 // studentAssignment loads the assignment for the signed-in student, writing
@@ -280,14 +284,16 @@ func (a *API) studentAssignment(w http.ResponseWriter, r *http.Request, id auth.
 		       aa.requires_start_code,aa.session_open,aa.start_code,a.locked_mode,a.national_paper,
 		       to_char(aa.opens_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'),
 		       to_char(aa.due_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'),
-		       COALESCE(aa.opens_at>now(),FALSE),COALESCE(aa.due_at<=now(),FALSE)
+		       COALESCE(aa.opens_at>now(),FALSE),COALESCE(aa.due_at<=now(),FALSE),
+		       a.kind,COALESCE(a.resource_id::text,''),COALESCE(tr.title,''),a.show_answers
 		FROM assessment_assignments aa
 		JOIN assessments a ON a.id=aa.assessment_id AND a.school_id=aa.school_id
+		LEFT JOIN teaching_resources tr ON tr.id=a.resource_id
 		JOIN enrollments e ON e.class_id=aa.class_id AND e.school_id=aa.school_id AND e.student_id=$3 AND e.status='active'
 		JOIN students s ON s.id=e.student_id AND s.school_id=e.school_id
 		WHERE aa.id=$1 AND aa.school_id=$2 AND a.status='published'
 		AND (aa.stream IS NULL OR aa.stream=s.stream OR EXISTS(SELECT 1 FROM assessment_attempts t WHERE t.assignment_id=aa.id AND t.student_id=s.id))`, r.PathValue("assignmentID"), id.SchoolID, studentID).Scan(
-		&view.Title, &view.Instructions, &view.DurationMinutes, &view.QuestionCount, &view.RequiresStartCode, &view.SessionOpen, &view.StartCode, &view.LockedMode, &view.NationalPaper, &view.OpensAt, &view.DueAt, &view.NotOpenYet, &view.PastDue)
+		&view.Title, &view.Instructions, &view.DurationMinutes, &view.QuestionCount, &view.RequiresStartCode, &view.SessionOpen, &view.StartCode, &view.LockedMode, &view.NationalPaper, &view.OpensAt, &view.DueAt, &view.NotOpenYet, &view.PastDue, &view.Kind, &view.ResourceID, &view.ResourceTitle, &view.ShowAnswers)
 	if errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, 404, "NOT_FOUND", "This assessment is not assigned to your active class.", nil)
 		return view, false
@@ -346,7 +352,14 @@ func (a *API) getStudentAssessment(w http.ResponseWriter, r *http.Request, id au
 		Feedback string          `json:"feedback,omitempty"`
 		Revision int             `json:"revision"`
 		Flagged  bool            `json:"flagged"`
+		// Only for a teacher's quiz, once answers can be shown.
+		Correct     json.RawMessage `json:"correct_answer,omitempty"`
+		IsCorrect   *bool           `json:"is_correct,omitempty"`
+		Explanation *string         `json:"explanation,omitempty"`
 	}
+	// A quiz shows its answers after the deadline, so nobody still working sees
+	// them from a friend. A written question's marking guide stays private.
+	reviewable := view.Kind != "exam" && view.ShowAnswers && resultsReleased && (view.DueAt == nil || view.PastDue)
 	questions := []assessmentQuestion{}
 	if attemptID != "" {
 		rows, err := a.db.Query(r.Context(), `
@@ -354,11 +367,15 @@ func (a *API) getStudentAssessment(w http.ResponseWriter, r *http.Request, id au
 			       answers.answer,
 			       CASE WHEN $2 THEN answers.awarded_points::text ELSE '' END,
 			       CASE WHEN $2 THEN answers.feedback ELSE '' END,
-			       COALESCE(answers.revision,0),COALESCE(answers.flagged,FALSE)
+			       COALESCE(answers.revision,0),COALESCE(answers.flagged,FALSE),
+			       CASE WHEN $3 AND item.question_snapshot->>'question_type'<>'text' THEN item.question_snapshot->'answer_key' END,
+			       CASE WHEN $3 THEN answers.is_correct END,
+			       CASE WHEN $3 THEN q.explanation->>'text' END
 			FROM assessment_attempt_items item
+			JOIN questions q ON q.id=item.question_id
 			LEFT JOIN assessment_answers answers ON answers.attempt_id=item.attempt_id AND answers.question_id=item.question_id
 			WHERE item.attempt_id=$1
-			ORDER BY item.position`, attemptID, resultsReleased)
+			ORDER BY item.position`, attemptID, resultsReleased, reviewable)
 		if err != nil {
 			a.serverError(w, r, err)
 			return
@@ -367,7 +384,7 @@ func (a *API) getStudentAssessment(w http.ResponseWriter, r *http.Request, id au
 		for rows.Next() {
 			var q assessmentQuestion
 			var awarded, feedback *string
-			if err = rows.Scan(&q.ID, &q.Type, &q.Prompt, &q.Options, &q.Points, &q.Answer, &awarded, &feedback, &q.Revision, &q.Flagged); err != nil {
+			if err = rows.Scan(&q.ID, &q.Type, &q.Prompt, &q.Options, &q.Points, &q.Answer, &awarded, &feedback, &q.Revision, &q.Flagged, &q.Correct, &q.IsCorrect, &q.Explanation); err != nil {
 				a.serverError(w, r, err)
 				return
 			}
@@ -390,7 +407,8 @@ func (a *API) getStudentAssessment(w http.ResponseWriter, r *http.Request, id au
 		"final_score": finalScore, "final_max_score": finalMax, "manual_review_count": manualReview, "questions": questions,
 		"question_count": view.QuestionCount, "duration_minutes": view.DurationMinutes, "requires_start_code": view.RequiresStartCode,
 		"session_open": view.SessionOpen, "locked_mode": view.LockedMode, "national_paper": view.NationalPaper, "opens_at": view.OpensAt, "due_at": view.DueAt,
-		"not_open_yet": view.NotOpenYet, "past_due": view.PastDue,
+		"not_open_yet": view.NotOpenYet, "past_due": view.PastDue, "kind": view.Kind, "resource_id": view.ResourceID, "resource_title": view.ResourceTitle,
+		"answers_after_due": view.Kind != "exam" && view.ShowAnswers && view.DueAt != nil && !view.PastDue,
 	}})
 }
 

@@ -456,13 +456,13 @@ func (a *API) updateClassSubject(w http.ResponseWriter, r *http.Request, id auth
 func (a *API) deleteClassSubject(w http.ResponseWriter, r *http.Request, id auth.Identity) {
 	subjectID := r.PathValue("subjectID")
 	var hasItems bool
-	err := a.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM mark_items i WHERE i.class_subject_id=cs.id) FROM class_subjects cs WHERE cs.id=$1 AND cs.school_id=$2`, subjectID, id.SchoolID).Scan(&hasItems)
+	err := a.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM mark_items i WHERE i.class_subject_id=cs.id) OR EXISTS(SELECT 1 FROM assessments q WHERE q.class_subject_id=cs.id) FROM class_subjects cs WHERE cs.id=$1 AND cs.school_id=$2`, subjectID, id.SchoolID).Scan(&hasItems)
 	if err != nil {
 		a.databaseError(w, r, err)
 		return
 	}
 	if hasItems {
-		writeError(w, 409, "SUBJECT_HAS_MARKS", "This subject has tests or marks, so it cannot be deleted.", nil)
+		writeError(w, 409, "SUBJECT_HAS_MARKS", "This subject has tests, quizzes or marks, so it cannot be deleted.", nil)
 		return
 	}
 	if _, err = a.db.Exec(r.Context(), `DELETE FROM class_subjects WHERE id=$1 AND school_id=$2`, subjectID, id.SchoolID); err != nil {

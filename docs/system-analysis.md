@@ -137,7 +137,20 @@ Limits: nothing is sent to parents, so they must open the portal, and no SMS goe
 
 Limits: most schools will see little here until they have published a report card or students have answered enough tagged questions, since typed marks say nothing about topics. Subject and topic names are matched by spelling, so a file or topic under another spelling, or a subject named in Amharic, is not connected. Files are suggested by subject only and the plan cannot tell whether a student opened one. Practice is offered only for national exam papers. Teachers still cannot set their own online tests or assignments. The older recommendations panel still sits lower on the page, and its text is stored in English, so it stays in English on Amharic screens.
 
-Next: teacher-made quizzes and assignments. SMS and phone sign-in still wait on choosing a provider.
+**2026-11-03 — Teacher quizzes and assignments built.**
+
+- A teacher writes a quiz or assignment for a class's subject, without going through the office: questions with one correct choice, a number, or a written answer they mark themselves, each with a topic and points. Drafts can be saved and changed. A worksheet from the class's files can be attached or uploaded on the spot.
+- Quizzes are timed and done in one sitting. Assignments stay open up to 30 days, with answers saved as the student goes, so they can come back. Both run on the existing exam engine, so marking, saved answers, recovery and skill tracking are shared, and written answers arrive in the teacher's existing marking queue.
+- Only a subject's own teacher or an administrator can write or change its work, or any teacher of the class if the subject has no named teacher. Once published, questions cannot change. A quiz can be taken back until someone starts it. Teachers can move the due date, which also reaches work under way, and copy a quiz to another section as a draft.
+- The class view shows who has handed in, how each question went, and topics from hardest to easiest. Written work not yet marked stays out of the figures.
+- Scores can be sent to the subject's marks as one test for a term. Students not yet marked stay blank rather than zero, sending again updates the same test, and published reports stay locked.
+- After the deadline, students see the correct answers and the teacher's explanations, unless the teacher turned that off. A marking guide is never shown. Results feed My learning by topic, and open work appears in its next steps.
+- Teachers' questions stay out of the national exam bank, so nothing skips an administrator's approval.
+- Migration 00022 adds this to the assessments table. New API tests cover all of this, including isolation between schools, and the whole flow ran in Edge against a production build, in English and Amharic and at phone width.
+
+Limits: questions are plain text, with no pictures or maths formatting, which will matter for maths and science. There is one correct choice per question, no question reuse beyond copying a whole quiz, and no retakes. Students answer online: paper or photo hand-ins are not built, so paper work still goes into marks by hand. A quiz with no due date shows its answers straight after submitting, so classmates could share them. A quiz topic is separate from the same-named topic in exam practice, so practice is only offered for exam practice topics. Administrators can attach a class's worksheet but only teachers can upload one. Nothing notifies students or parents when work is set.
+
+Next: SMS and phone sign-in, which wait on choosing a provider, and pictures in questions.
 
 ---
 

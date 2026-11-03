@@ -6,7 +6,7 @@ import { clearPendingAnswers, listPendingAnswers, removePendingAnswer, savePendi
 import { usePaperName } from '../../features/prep/readiness'
 import { Simulator } from '../../features/prep/Simulator'
 import { MessageKey, useI18n } from '../../i18n'
-import { api } from '../../lib/api'
+import { api, apiURL } from '../../lib/api'
 import { useRefresh } from '../../lib/queries'
 import type { LearnerAssessment } from '../../lib/types'
 
@@ -30,6 +30,7 @@ export default function ExamRoute() {
 // so a lost connection or a closed tab cannot lose work.
 function ExamPage({ assignmentID }: { assignmentID: string }) {
   const { t, errorText } = useI18n()
+  const { dateTime } = useDates()
   const paperName = usePaperName()
   const refresh = useRefresh()
   const [assessment, setAssessment] = useState<LearnerAssessment | null>(null)
@@ -226,8 +227,9 @@ function ExamPage({ assignmentID }: { assignmentID: string }) {
       </div>}
       <div className="exam-status">
         <span>{online ? t('exam.connected', { state: t(syncLabels[syncState]) }) : t('exam.disconnected', { state: t(syncLabels[syncState]) })}</span>
-        <strong>{t('exam.timeLeft', { time: `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}` })}</strong>
+        <strong>{t('exam.timeLeft', { time: secondsLeft >= 3600 ? t('quiz.daysHours', { days: Math.floor(secondsLeft / 86400), hours: Math.floor((secondsLeft % 86400) / 3600) }) : `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}` })}</strong>
       </div>
+      <Worksheet assessment={assessment} />
       <nav className="exam-question-nav" aria-label={t('exam.questionsNav')}>
         {assessment.questions.map((q, index) => <button type="button" key={q.id} className={flags[q.id] ? 'flagged-question' : ''}
           onClick={() => document.getElementById(`question-${q.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
@@ -269,8 +271,37 @@ function ExamPage({ assignmentID }: { assignmentID: string }) {
         <strong>{t('exam.writtenLine', { n: index + 1, awarded: q.awarded_points ?? 0, points: q.points })}</strong>
         <p>{q.feedback}</p>
       </div>)}
+      {assessment.answers_after_due && assessment.due_at && <p className="form-hint">{t('quiz.answersLater', { date: dateTime(assessment.due_at) })}</p>}
+    </section>}
+    {assessment.status === 'submitted' && assessment.questions.some((q) => q.is_correct !== undefined || q.explanation) && <section className="panel quiz-review">
+      <div className="panel-head"><div><h2>{t('quiz.reviewTitle')}</h2></div></div>
+      {assessment.questions.map((q, index) => <article key={q.id} className="quiz-review-item">
+        <div className="learner-question-title">
+          <span>{t('exam.question', { n: index + 1 })}</span>
+          {q.is_correct !== undefined && <span className={`attendance-tag ${q.is_correct ? 'present' : 'absent'}`}>{q.is_correct ? t('quiz.correct') : t('quiz.notCorrect')}</span>}
+        </div>
+        <p><strong>{q.prompt?.text}</strong></p>
+        <p>{t('quiz.yourAnswer', { answer: answerText(q, q.answer) || '—' })}</p>
+        {q.correct_answer !== undefined && <p>{t('quiz.correctAnswer', { answer: answerText(q, q.correct_answer) })}</p>}
+        {q.explanation && <p className="form-hint">{q.explanation}</p>}
+      </article>)}
     </section>}
   </>
+}
+
+// answerText turns a stored answer or answer key into words for the review.
+function answerText(q: LearnerAssessment['questions'][number], value: unknown) {
+  if (value === null || value === undefined) return ''
+  if (q.question_type === 'numeric' && typeof value === 'object' && 'value' in value) return String(value.value)
+  const chosen = Array.isArray(value) ? value.map(String) : [String(value)]
+  if (q.options?.length) return q.options.filter((option) => chosen.includes(option.id)).map((option) => option.text).join(', ')
+  return chosen.join(', ')
+}
+
+function Worksheet({ assessment }: { assessment: LearnerAssessment }) {
+  const { t } = useI18n()
+  if (!assessment.resource_id) return null
+  return <p className="quiz-worksheet">{t('quiz.worksheetFor')} <a href={apiURL(`/resources/${assessment.resource_id}/download`)}>{assessment.resource_title}</a></p>
 }
 
 // StartPanel is shown before the exam timer begins.
@@ -280,8 +311,9 @@ function StartPanel({ assessment, busy, onStart }: { assessment: LearnerAssessme
   const [code, setCode] = useState('')
   const waitingForSession = assessment.requires_start_code && !assessment.session_open
   return <section className="panel learner-start">
-    <p>{t('exam.startIntro', { questions: assessment.question_count, minutes: assessment.duration_minutes })}</p>
-    {assessment.due_at && <p>{t('exam.startBefore', { time: dateTime(assessment.due_at) })}</p>}
+    <p>{assessment.kind === 'assignment' ? t('quiz.assignmentIntro', { questions: assessment.question_count }) : t('exam.startIntro', { questions: assessment.question_count, minutes: assessment.duration_minutes })}</p>
+    <Worksheet assessment={assessment} />
+    {assessment.due_at && <p>{assessment.kind === 'assignment' ? t('quiz.assignmentDue', { time: dateTime(assessment.due_at) }) : t('exam.startBefore', { time: dateTime(assessment.due_at) })}</p>}
     {assessment.locked_mode && <p className="form-hint">{t('exam.lockedHint')}</p>}
     {assessment.not_open_yet
       ? <p className="empty">{t('exam.opensAt', { time: dateTime(assessment.opens_at) })}</p>
