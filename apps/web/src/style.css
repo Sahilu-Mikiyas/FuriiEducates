@@ -376,3 +376,78 @@ footer span{color:#1d4ed8}
 @media(max-width:700px){
   .mock-slot{grid-template-columns:1fr}
 }
+
+/* Student records and attendance */
+.content>.toast{position:sticky;top:66px;z-index:20}
+.teacher-content>.toast{position:sticky;top:8px;z-index:20}
+.student-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,240px);gap:8px;margin:14px 0}
+.student-filters input,.student-filters select,.register-class,.attendance-range select,.register-note{width:100%;min-height:38px;padding:7px 10px;border:1px solid #d9dedb;border-radius:6px;background:#fff;font:inherit;font-size:13px}
+.student-import{margin:12px 0;padding:10px 12px;border:1px solid #ececec;border-radius:8px}
+.student-import summary{cursor:pointer;font-size:13px;font-weight:600}
+.student-import p{margin:8px 0;color:#555;font-size:12px}
+.check-row{display:inline-flex;align-items:center;gap:6px;font-size:12px}
+.pager{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;margin-top:12px;font-size:13px}
+.profile-back{display:inline-block;margin-bottom:10px;font-size:13px}
+.profile-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.profile-head>div:nth-child(2){flex:1;min-width:0}
+.profile-head h2{margin:0;font-size:18px}
+.profile-head p{margin:2px 0 0;color:#555;font-size:13px}
+.profile-medical{margin:12px 0 0;padding:10px 12px;border-radius:8px;background:#fef3c7;color:#713f12;font-size:13px;overflow-wrap:anywhere}
+.profile-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.profile-form label{display:grid;gap:4px;min-width:0;color:#41534b;font-size:12px;font-weight:600}
+.profile-form input,.profile-form select,.profile-form textarea{width:100%;min-height:38px;padding:7px 10px;border:1px solid #d9dedb;border-radius:6px;background:#fff;font:inherit;font-size:13px;font-weight:400}
+.profile-form>button{justify-self:start;align-self:end}
+.profile-wide{grid-column:1/-1}
+.profile-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:0}
+.profile-facts dt{color:#666;font-size:12px}
+.profile-facts dd{margin:2px 0 0;font-size:14px;overflow-wrap:anywhere}
+.guardian-list,.attendance-people,.attendance-recent,.register-list{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:0;padding:0;list-style:none}
+.guardian-list>li{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 12px;border:1px solid #ececec;border-radius:8px}
+.guardian-list>li.empty{display:block;border:0}
+.guardian-list>li>form{flex:1 1 100%;min-width:0}
+.guardian-who{display:grid;flex:1 1 200px;gap:2px;min-width:0;font-size:14px;overflow-wrap:anywhere}
+.guardian-who small{color:#666;font-size:12px}
+.guardian-add{margin-top:16px;padding-top:14px;border-top:1px solid #ececec}
+.guardian-list .operation-actions,.register-foot .operation-actions,.attendance-range .operation-actions{flex-wrap:wrap}
+.attendance-subhead{margin:14px 0 8px;font-size:14px}
+.guardian-add .attendance-subhead{margin:0}
+.attendance-counts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.attendance-count{display:grid;gap:2px;padding:10px;border-radius:8px;background:#f6f7f6;text-align:center}
+.attendance-count strong{font-size:20px}
+.attendance-count span{color:#555;font-size:12px;overflow-wrap:anywhere}
+.attendance-count.absent strong{color:#b91c1c}
+.attendance-count.late strong{color:#b45309}
+.attendance-count.present strong{color:#15803d}
+.attendance-recent li{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px}
+.attendance-recent small{flex:1 1 100%;color:#666;font-size:12px;overflow-wrap:anywhere}
+.attendance-tag{display:inline-block;padding:2px 8px;border-radius:6px;background:#f1f5f9;color:#334155;font-size:12px}
+.attendance-tag.absent{background:#fee2e2;color:#991b1b}
+.attendance-tag.late{background:#fef3c7;color:#92400e}
+.attendance-people>li{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;padding:10px 12px;border:1px solid #ececec;border-radius:8px}
+.attendance-people>li.empty{display:block;border:0}
+.attendance-people>li>div{display:grid;flex:1 1 200px;gap:2px;min-width:0;overflow-wrap:anywhere}
+.attendance-people small{color:#666;font-size:12px}
+.attendance-contact,.attendance-nocontact{font-size:13px;overflow-wrap:anywhere}
+.attendance-contact a{font-weight:600;white-space:nowrap}
+.attendance-nocontact{color:#b45309}
+.attendance-range{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));align-items:end;gap:12px;margin-bottom:12px}
+.status-pill.draft{background:#fef3c7;color:#92400e}
+.register-class{max-width:320px;margin-bottom:12px}
+.register-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.register-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,auto);align-items:center;gap:8px 14px;padding:10px 12px;border:1px solid #ececec;border-radius:8px}
+.register-name{display:grid;gap:1px;min-width:0;font-size:14px;overflow-wrap:anywhere}
+.register-name small{color:#666;font-size:12px}
+.register-marks{display:grid;grid-template-columns:repeat(4,minmax(64px,1fr));gap:4px}
+.register-mark{min-height:40px;padding:4px 6px;border:1px solid #d9dedb;border-radius:6px;background:#fff;color:#333;font:inherit;font-size:12px;cursor:pointer}
+.register-mark[aria-pressed=true]{border-color:transparent;color:#fff;font-weight:600}
+.register-mark.present[aria-pressed=true]{background:#15803d}
+.register-mark.absent[aria-pressed=true]{background:#b91c1c}
+.register-mark.late[aria-pressed=true]{background:#b45309}
+.register-mark.excused[aria-pressed=true]{background:#475569}
+.register-note{grid-column:1/-1}
+.register-foot{position:sticky;bottom:0;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:10px 0;background:#fff;font-size:13px}
+@media(max-width:700px){
+  .student-filters,.profile-form,.register-row{grid-template-columns:minmax(0,1fr)}
+  .register-marks{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .attendance-counts{grid-template-columns:repeat(2,minmax(0,1fr))}
+}

@@ -34,9 +34,7 @@ export async function readAPIResponse(response: Response) {
   }
 }
 
-// api sends a request with the session cookie and returns the response's data
-// envelope, or throws an APIError carrying the server's message and code.
-export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+async function request(path: string, init?: RequestInit) {
   const headers = new Headers(init?.headers)
   if (init?.body !== undefined && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
@@ -46,5 +44,17 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     throw new APIError(body?.error?.message ?? 'The request could not be completed.', response.status, body?.error?.code ?? 'REQUEST_FAILED')
   }
-  return body.data as T
+  return body
+}
+
+// api sends a request with the session cookie and returns the response's data
+// envelope, or throws an APIError carrying the server's message and code.
+export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  return (await request(path, init)).data as T
+}
+
+// apiPage is api for a paged list, which also returns the total across all pages.
+export async function apiPage<T>(path: string): Promise<{ data: T; total: number }> {
+  const body = await request(path)
+  return { data: body.data as T, total: body.total as number }
 }

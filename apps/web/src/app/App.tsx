@@ -18,6 +18,8 @@ const MarketingLanding = lazy(() => import('../marketing').then((m) => ({ defaul
 const AdminLayout = lazy(() => import('../pages/admin/AdminLayout'))
 const OverviewPage = lazy(() => import('../pages/admin/OverviewPage'))
 const StudentsPage = lazy(() => import('../pages/admin/StudentsPage'))
+const AttendancePage = lazy(() => import('../pages/admin/AttendancePage'))
+const StudentProfile = lazy(() => import('../features/students/StudentProfile'))
 const ClassesPage = lazy(() => import('../pages/admin/ClassesPage'))
 const AcademicHistoryPage = lazy(() => import('../pages/admin/AcademicHistoryPage'))
 const CurriculumPage = lazy(() => import('../pages/admin/CurriculumPage'))
@@ -31,6 +33,7 @@ const QuestionBankPage = lazy(() => import('../features/prep/QuestionBank').then
 const MockDaysPage = lazy(() => import('../features/prep/MockDays').then((m) => ({ default: m.MockDays })))
 const TeacherLayout = lazy(() => import('../pages/teacher/TeacherLayout'))
 const ClassPage = lazy(() => import('../pages/teacher/ClassPage'))
+const TeacherAttendancePage = lazy(() => import('../pages/teacher/AttendancePage'))
 const teacherPage = (name: 'TeacherReadinessPage' | 'TeacherSessionsPage' | 'TeacherGradebookPage' | 'TeacherAnswersPage' | 'TeacherPlanningPage' | 'TeacherAccountPage') =>
   lazy(() => import('../pages/teacher/pages').then((m) => ({ default: m[name] })))
 const TeacherSessionsPage = teacherPage('TeacherSessionsPage')
@@ -100,6 +103,8 @@ export function App() {
         <Route index element={<Navigate to="overview" replace />} />
         <Route path="overview" element={<OverviewPage />} />
         <Route path="students" element={<StudentsPage />} />
+        <Route path="students/:studentID" element={<StudentProfile canEdit base="/admin" />} />
+        <Route path="attendance" element={<AttendancePage />} />
         <Route path="classes" element={<ClassesPage />} />
         <Route path="academic-passport" element={<AcademicHistoryPage />} />
         <Route path="curriculum" element={<CurriculumPage />} />
@@ -119,6 +124,8 @@ export function App() {
       <Route path="/teach" element={<RequireRole role="teacher" render={(user) => <TeacherLayout identity={user} />} />}>
         <Route index element={<Navigate to="class" replace />} />
         <Route path="class" element={<ClassPage />} />
+        <Route path="attendance" element={<TeacherAttendancePage />} />
+        <Route path="students/:studentID" element={<StudentProfile canEdit={false} base="/teach" />} />
         <Route path="exam-sessions" element={<TeacherSessionsPage />} />
         <Route path="gradebook" element={<TeacherGradebookPage />} />
         <Route path="written-answers" element={<TeacherAnswersPage />} />

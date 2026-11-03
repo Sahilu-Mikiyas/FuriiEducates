@@ -12,6 +12,7 @@ export const useTeacherContext = () => useOutletContext<TeacherContext>()
 
 const teacherPages: { path: string; label: MessageKey }[] = [
   { path: 'class', label: 'teacher.nav.class' },
+  { path: 'attendance', label: 'teacher.nav.attendance' },
   { path: 'exam-sessions', label: 'teacher.nav.sessions' },
   { path: 'gradebook', label: 'teacher.nav.gradebook' },
   { path: 'written-answers', label: 'teacher.nav.answers' },

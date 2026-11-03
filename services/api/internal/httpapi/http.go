@@ -71,6 +71,8 @@ func (a *API) routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/me", a.me)
 	a.registerSchoolRoutes(mux)
 	a.registerPrepRoutes(mux)
+	a.registerStudentRecordRoutes(mux)
+	a.registerAttendanceRoutes(mux)
 	return a.cors(mux)
 }
 

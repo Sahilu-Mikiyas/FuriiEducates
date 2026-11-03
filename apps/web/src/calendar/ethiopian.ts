@@ -58,6 +58,12 @@ export function parseISODate(value: string): CalendarDate | null {
   return roundTrip.month === date.month && roundTrip.day === date.day ? date : null
 }
 
+// todayISO is the device's date, which is the school's day when staff are at school.
+export function todayISO() {
+  const now = new Date()
+  return toISODate({ year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() })
+}
+
 export function toISODate({ year, month, day }: CalendarDate) {
   return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }

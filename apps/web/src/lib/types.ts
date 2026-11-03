@@ -6,7 +6,22 @@ export type SchoolSetupProfile = { learner_count_band: string; region: string; p
 export type School = { id: string; name: string; timezone: string; default_language: string }
 export type Year = { id: string; name: string; starts_on: string; ends_on: string }
 export type ClassRoom = { id: string; name: string; grade_level: string; academic_year_id: string; academic_year_name?: string }
-export type Student = { id: string; student_number: string; legal_name: string; preferred_language: string; status: string; has_account: boolean }
+export type Student = { id: string; student_number: string; legal_name: string; preferred_language: string; status: string; has_account: boolean; stream?: string; class_id?: string; class_name?: string; grade_level?: string }
+export type Guardian = { id: string; full_name: string; relationship: string; phone: string; email: string; is_primary: boolean }
+export type AttendanceSummaryData = { days_marked: number; present: number; absent: number; late: number; excused: number; recent: { date: string; status: string; note: string }[] }
+export type StudentProfileData = {
+  student: { id: string; student_number: string; legal_name: string; date_of_birth: string; gender: string; preferred_language: string; address: string; medical_notes: string; stream: string; status: string; has_account: boolean; class_id: string; class_name: string; grade_level: string }
+  guardians: Guardian[]
+  attendance: AttendanceSummaryData
+}
+export type RegisterData = { date: string; taken: boolean; students: { student_id: string; student_number: string; student_name: string; status: string; note: string }[] }
+export type AttendanceOverview = {
+  date: string
+  classes: { class_id: string; name: string; grade_level: string; students: number; marked: number; present: number; absent: number; late: number; excused: number }[]
+  absentees: { student_id: string; student_number: string; student_name: string; grade_level: string; class_name: string; note: string; guardian_name: string; guardian_relationship: string; guardian_phone: string }[]
+}
+export type AttendanceAlert = { student_id: string; student_number: string; student_name: string; grade_level: string; class_name: string; guardian_name: string; guardian_phone: string; days_marked: number; days_absent: number; current_streak: number; reason: 'streak' | 'rate' }
+export type AttendanceReportData = { days_taken: number; students: { student_id: string; student_number: string; student_name: string; present: number; absent: number; late: number; excused: number }[] }
 export type AcademicRecord = { id: string; school_name: string; academic_year_label: string; grade_level: string; subject_name: string; score: number | null; maximum_score: number | null; grade_label: string; grading_scale_name: string; source_type: string; verification_status: string }
 export type ExternalExam = { id: string; exam_name: string; exam_provider: string; exam_date: string; subject_or_section: string; score: number | null; maximum_score: number | null; score_label: string; verification_status: string; breakdowns: { section_name: string; score: number | null; maximum_score: number | null }[] }
 export type ImportPreview = { id: string; status: string; row_count: number; valid_rows: number; error_rows: number; can_commit: boolean; row_errors: { row: number; errors: string[] }[] }
@@ -68,4 +83,4 @@ export type MockResults = { students: MockStudent[]; summary: MockSummary; pass_
 export type StudentMockRound = { id: string; name: string; total?: number; papers: { paper: string; assignment_id: string; opens_at: string | null; due_at: string | null; duration_minutes: number; status: string; score?: number }[] }
 
 export type ClassOption = { id: string; name: string; grade_level: string }
-export const classLabel = (classroom: ClassOption) => `${classroom.grade_level} · ${classroom.name}`
+export const classLabel = (classroom: Pick<ClassOption, 'grade_level' | 'name'>) => `${classroom.grade_level} · ${classroom.name}`

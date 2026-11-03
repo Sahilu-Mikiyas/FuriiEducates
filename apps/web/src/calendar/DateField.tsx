@@ -22,13 +22,15 @@ function isoFrom(parts: Parts) {
 
 // DateField asks for a date in either calendar and always submits a Gregorian
 // YYYY-MM-DD value under `name`, or YYYY-MM-DDTHH:mm with `withTime`. It follows
-// the form's reset, so forms can keep using form.reset().
-export function DateField({ name, label, defaultValue = '', required = false, withTime = false }: {
+// the form's reset, so forms can keep using form.reset(). `onValue` receives each
+// complete date, for a page that reloads as the date changes.
+export function DateField({ name, label, defaultValue = '', required = false, withTime = false, onValue }: {
   name: string
   label: string
   defaultValue?: string
   required?: boolean
   withTime?: boolean
+  onValue?: (value: string) => void
 }) {
   const { t, language, calendar } = useI18n()
   const initialDate = defaultValue.slice(0, 10)
@@ -50,6 +52,7 @@ export function DateField({ name, label, defaultValue = '', required = false, wi
   const iso = useEthiopian ? isoFrom(parts) : gregorian
   const parsed = iso ? parseISODate(iso) : null
   const value = iso && withTime ? (time ? `${iso}T${time}` : '') : iso
+  useEffect(() => { if (value) onValue?.(value) }, [value, onValue])
   const days = parts.year && parts.month ? daysInEthiopianMonth(Number(parts.year), Number(parts.month)) : 30
   const change = (next: Partial<Parts>) => setParts((current) => {
     const merged = { ...current, ...next }

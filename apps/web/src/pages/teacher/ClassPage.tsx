@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { useI18n } from '../../i18n'
 import { useTeacherLearning, useTeacherRoster } from '../../lib/queries'
 import { useTeacherContext } from './TeacherLayout'
@@ -19,7 +20,7 @@ export default function ClassPage() {
       <div className="table-wrap"><table>
         <thead><tr><th>{t('common.col.student')}</th><th>{t('students.col.id')}</th><th>{t('teacher.col.language')}</th><th>{t('common.col.status')}</th></tr></thead>
         <tbody>
-          {students.map((s) => <tr key={s.id}><td><strong>{s.legal_name}</strong></td><td>{s.student_number}</td><td>{s.preferred_language || '—'}</td><td><span className="status-pill">{label('status', s.status)}</span></td></tr>)}
+          {students.map((s) => <tr key={s.id}><td><Link to={`/teach/students/${s.id}`}><strong>{s.legal_name}</strong></Link></td><td>{s.student_number}</td><td>{s.preferred_language || '—'}</td><td><span className="status-pill">{label('status', s.status)}</span></td></tr>)}
           {!rosterQuery.isPending && !students.length && <tr><td colSpan={4} className="empty">{t('common.noActiveStudents')}</td></tr>}
         </tbody>
       </table></div>

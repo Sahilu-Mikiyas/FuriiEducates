@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -257,8 +258,51 @@ func (a *API) createClass(w http.ResponseWriter, r *http.Request, id auth.Identi
 	writeJSON(w, 201, map[string]any{"data": result})
 }
 
+// listStudents returns the school's students. With a page number it serves the
+// students screen, one page at a time with a total. Without one it is the full
+// list that pickers across the app use.
 func (a *API) listStudents(w http.ResponseWriter, r *http.Request, id auth.Identity) {
-	rows, err := a.db.Query(r.Context(), `SELECT s.id::text,s.student_number,s.legal_name,COALESCE(s.preferred_language,''),s.status,(s.user_id IS NOT NULL) FROM students s WHERE s.school_id=$1 ORDER BY s.legal_name,s.student_number LIMIT 200`, id.SchoolID)
+	query := r.URL.Query()
+	search := strings.TrimSpace(query.Get("q"))
+	if len(search) > 200 {
+		writeError(w, 400, "VALIDATION_ERROR", "Search for fewer than 200 characters.", nil)
+		return
+	}
+	classID := query.Get("class_id")
+	if classID != "" && !uuidPattern.MatchString(classID) {
+		writeError(w, 400, "VALIDATION_ERROR", "A class could not be read.", nil)
+		return
+	}
+	limit, offset := maxStudentPickerRows, 0
+	paged := query.Get("page") != ""
+	if paged {
+		page, err := strconv.Atoi(query.Get("page"))
+		if err != nil || page < 1 {
+			writeError(w, 400, "VALIDATION_ERROR", "A page number could not be read.", nil)
+			return
+		}
+		limit = 25
+		if value := query.Get("page_size"); value != "" {
+			if limit, err = strconv.Atoi(value); err != nil || limit < 1 || limit > maxStudentPageSize {
+				writeError(w, 400, "VALIDATION_ERROR", "Show from 1 to 100 students per page.", nil)
+				return
+			}
+		}
+		offset = (page - 1) * limit
+	}
+	pattern := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(search) + "%"
+	const filter = `s.school_id=$1 AND ($2='' OR s.legal_name ILIKE $3 OR s.student_number ILIKE $3)
+		AND ($4='' OR EXISTS(SELECT 1 FROM enrollments e WHERE e.student_id=s.id AND e.school_id=s.school_id AND e.status='active' AND e.class_id=$4::uuid))`
+	var total int
+	if err := a.db.QueryRow(r.Context(), `SELECT count(*)::int FROM students s WHERE `+filter, id.SchoolID, search, pattern, classID).Scan(&total); err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	rows, err := a.db.Query(r.Context(), `SELECT s.id::text,s.student_number,s.legal_name,COALESCE(s.preferred_language,''),s.status,(s.user_id IS NOT NULL),COALESCE(s.stream,''),COALESCE(c.id::text,''),COALESCE(c.name,''),COALESCE(c.grade_level,'')
+		FROM students s
+		LEFT JOIN LATERAL (SELECT e.class_id FROM enrollments e WHERE e.student_id=s.id AND e.school_id=s.school_id AND e.status='active' ORDER BY e.enrolled_at DESC LIMIT 1) current ON TRUE
+		LEFT JOIN classes c ON c.id=current.class_id
+		WHERE `+filter+` ORDER BY s.legal_name,s.student_number LIMIT $5 OFFSET $6`, id.SchoolID, search, pattern, classID, limit, offset)
 	if err != nil {
 		a.serverError(w, r, err)
 		return
@@ -266,19 +310,20 @@ func (a *API) listStudents(w http.ResponseWriter, r *http.Request, id auth.Ident
 	defer rows.Close()
 	items := []map[string]any{}
 	for rows.Next() {
-		var x [5]string
+		var x [8]string
+		var number, name string
 		var hasAccount bool
-		if err := rows.Scan(&x[0], &x[1], &x[2], &x[3], &x[4], &hasAccount); err != nil {
+		if err := rows.Scan(&x[0], &number, &name, &x[1], &x[2], &hasAccount, &x[3], &x[4], &x[5], &x[6]); err != nil {
 			a.serverError(w, r, err)
 			return
 		}
-		items = append(items, map[string]any{"id": x[0], "student_number": x[1], "legal_name": x[2], "preferred_language": x[3], "status": x[4], "has_account": hasAccount})
+		items = append(items, map[string]any{"id": x[0], "student_number": number, "legal_name": name, "preferred_language": x[1], "status": x[2], "has_account": hasAccount, "stream": x[3], "class_id": x[4], "class_name": x[5], "grade_level": x[6]})
 	}
 	if err := rows.Err(); err != nil {
 		a.serverError(w, r, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"data": items})
+	writeJSON(w, 200, map[string]any{"data": items, "total": total})
 }
 
 func (a *API) createStudent(w http.ResponseWriter, r *http.Request, id auth.Identity) {

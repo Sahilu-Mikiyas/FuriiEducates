@@ -89,7 +89,20 @@ Limits: secure exams and online timed papers cannot be reopened while offline, t
 
 Limits: the mock day has one timetable for all chosen classes, with no rooms or seating. Invigilators open each class's session one at a time. The trend compares different questions, so it is labelled as a rough guide.
 
-Next: real question content, then the parent view and notifications.
+**2026-11-02 — Core operations started: student records and attendance built.**
+
+- The students list now searches by name or ID, filters by class and pages through results, so it works for a whole school. Without a page number the API still returns the full list that pickers use, up to 5,000.
+- Schools can import students from a CSV, with Ethiopian or Gregorian birth dates, class matching by grade and section, and a guardian on each row. Any bad row saves nothing and is named. A student number already in use is refused, and the same name and birth date is held back unless the school confirms.
+- Each student has a profile: birth date, gender, address, medical notes and guardians. The first guardian becomes the main contact, and there is always one while any guardian remains. Administrators edit. A teacher of the student's current class reads it, because medical notes matter in the classroom. Medical notes stay out of the audit log.
+- A student can move class. Their attendance and results stay with the class they were earned in.
+- Teachers and administrators take a daily class register with one tap per student and a "mark the rest present" button. Marks are kept as a draft while switching class or date on the page. Teachers can correct the last 14 days and administrators any past day. Future dates are refused, allowing one day for the school's time zone being ahead of the server.
+- The office sees which registers are in, and a list of absent students with their main contact's number to tap. Excused students are left out.
+- Repeated absence is flagged: three absences running, or at least three that make up a tenth of at least five marked days in the last 30. An excused day neither adds to a run nor ends it. Reports total a class over any period, with a CSV download. Students see their own last 30 days.
+- Migration 00019 adds the tables. New API tests cover all of this, including isolation between schools, and the whole flow ran in Edge against a production build, in English and Amharic and at phone width. That run caught two real bugs, both fixed: making a guardian the main contact and saving a register each sent fields the API refuses. It also showed a page's message scrolling out of view on a long register, so messages now stay in view on the administrator and teacher pages.
+
+Limits: attendance is daily per class, not per period, and staff attendance is not built. Nothing is sent to parents yet: the call list stands in until an SMS provider is chosen. A guardian belongs to one student, so a parent of two children has two records until the parent portal links them. Register dates use the device's date, and a wrong clock on a phone would mark the wrong day. Import row errors and other server validation messages are still in English on the Amharic screens. Admissions, documents, photos, ID cards and promotion are not built. No file of a whole school's size has been imported, and the import has not been timed against the hosted database.
+
+Next in core operations: continuous assessment and report cards, then the parent portal and SMS.
 
 ---
 

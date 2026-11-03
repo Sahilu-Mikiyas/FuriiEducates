@@ -132,7 +132,7 @@ Status key: **Exists**, **Partial**, **New**. Each module lists the operations a
   - waitlist promotion when a seat frees;
   - turning an accepted applicant into a student record with an ID number, guardians and a first invoice.
 
-### 3.2 Student information (Partial)
+### 3.2 Student information (Partial: profiles, guardians, medical notes, moving class, duplicate checks and bulk import are built)
 - **Operations:** student profiles, guardians and emergency contacts, medical notes, special needs, documents, photos, ID cards, transfers in and out, promotion and repetition, graduation, alumni.
 - **Automate:**
   - ID card generation with QR codes;
@@ -152,7 +152,7 @@ Status key: **Exists**, **Partial**, **New**. Each module lists the operations a
   - substitute suggestions when a teacher is absent;
   - conflict detection.
 
-### 3.5 Attendance (New)
+### 3.5 Attendance (Partial: daily class registers, absentee call list, repeated-absence alerts and reports are built; per-period, staff attendance, check-in and SMS are not)
 - **Operations:** daily and per-period student attendance, lateness, excused absences, staff attendance.
 - **Automate:**
   - one-tap class registers on a phone;

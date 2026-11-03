@@ -114,7 +114,7 @@ paths:
         '401': { description: Authentication required }
   /student/prep:
     get:
-      summary: The student's exam prep home: stream, papers, readiness, open practice and mocks
+      summary: "The student's exam prep home: stream, papers, readiness, open practice and mocks"
       security: [{ sessionCookie: [] }]
       responses:
         '200': { description: Success }
@@ -220,6 +220,94 @@ paths:
         '200': { description: Success }
         '401': { description: Authentication required }
         '409': { description: Students have started this mock day }
+  /students/{studentID}/profile:
+    get:
+      summary: Student profile with guardians and recent attendance (administrator or a teacher of the student's class)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    put:
+      summary: Update a student's profile (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /students/{studentID}/guardians:
+    post:
+      summary: Add a guardian. The first becomes the primary contact (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /students/{studentID}/guardians/{guardianID}:
+    put:
+      summary: Update a guardian (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    delete:
+      summary: Remove a guardian (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /students/{studentID}/move:
+    post:
+      summary: Move a student to another class. Past attendance stays with the old class (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /students/import:
+    post:
+      summary: Import students from a CSV. Any bad row saves nothing and returns row_errors. allow_duplicates=true continues past likely duplicates (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /attendance/classes/{classID}:
+    get:
+      summary: A class's register for a date (administrator or assigned teacher)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    put:
+      summary: Save marks for a date. Teachers can change the last 14 days (administrator or assigned teacher)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /attendance/overview:
+    get:
+      summary: Registers taken and absentees with guardian phones for a date (administrator)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /attendance/alerts:
+    get:
+      summary: Students with repeated absence in the last 30 days. Teachers must name a class
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /attendance/report:
+    get:
+      summary: A class's attendance totals for a period (administrator or assigned teacher)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /student/attendance:
+    get:
+      summary: The student's own last 30 days
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
   /demo-requests:
     post:
       summary: Submit a public school setup request
@@ -368,7 +456,7 @@ paths:
         '201': { description: Class created }
   /students:
     get:
-      summary: List students in the current school
+      summary: List students in the current school. Optional q, class_id, page and page_size. With page, results come one page at a time with a total
       security: [{ sessionCookie: [] }]
       responses:
         '200': { description: Students }

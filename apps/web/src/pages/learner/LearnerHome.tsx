@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAction } from '../../app/feedback'
 import { useSession } from '../../app/session'
+import { AttendanceSummary } from '../../features/attendance/AttendanceSummary'
 import { StudentResources } from '../../features/operations/Resources'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { useRefresh } from '../../lib/queries'
-import type { StudentLearningProfile } from '../../lib/types'
+import type { AttendanceSummaryData, StudentLearningProfile } from '../../lib/types'
 
 const PROFILE_PATH = '/student/learning-profile'
 
@@ -15,6 +16,7 @@ export default function LearnerHome() {
   const { busy, run } = useAction()
   const refresh = useRefresh()
   const profile = useQuery({ queryKey: [PROFILE_PATH], queryFn: () => api<StudentLearningProfile>(PROFILE_PATH) }).data
+  const attendance = useQuery({ queryKey: ['/student/attendance'], queryFn: () => api<AttendanceSummaryData>('/student/attendance') }).data
   const change = (id: string, action: 'accept' | 'complete') => run(async () => {
     await api(`/student/recommendations/${id}/${action}`, { method: 'POST', body: '{}' })
     await refresh(PROFILE_PATH)
@@ -56,6 +58,7 @@ export default function LearnerHome() {
         </div>
       </section>
     </>}
+    {attendance && <AttendanceSummary summary={attendance} />}
     <StudentResources />
   </>
 }
