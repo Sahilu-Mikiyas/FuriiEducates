@@ -6,6 +6,7 @@ import { DateField } from '../../calendar/DateField'
 import { ethiopianToGregorian, gregorianToEthiopian, parseISODate, todayISO, toISODate } from '../../calendar/ethiopian'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
+import { downloadCSV } from '../../lib/csv'
 import { useRefresh } from '../../lib/queries'
 import { AttendanceAlert, AttendanceReportData, ClassRoom, classLabel, RegisterData } from '../../lib/types'
 
@@ -124,12 +125,6 @@ export function AttendanceAlerts({ classID, base }: { classID?: string; base: '/
   </section>
 }
 
-// A name starting with one of these runs as a formula when a spreadsheet opens the file.
-const csvCell = (value: string | number) => {
-  const text = String(value)
-  return `"${(/^[=+\-@\t\r]/.test(text) ? `'${text}` : text).replace(/"/g, '""')}"`
-}
-
 const attendanceRate = (row: { present: number; late: number; absent: number }) => {
   const days = row.present + row.late + row.absent
   return days ? Math.round(((row.present + row.late) / days) * 100) : null
@@ -162,17 +157,13 @@ export function AttendanceReport({ classID, classes }: { classID?: string; class
     setRange({ from: String(values.get('from')), to: String(values.get('to')) })
   }
   const download = () => {
-    const headers = [t('students.id'), t('students.fullName'), t('attendance.status.present'), t('attendance.status.late'), t('attendance.status.absent'), t('attendance.status.excused'), t('attendance.col.rate')]
-    const lines = [headers.map(csvCell).join(',')]
-    for (const row of rows) {
-      const rate = attendanceRate(row)
-      lines.push([row.student_number, row.student_name, row.present, row.late, row.absent, row.excused, rate === null ? '' : `${rate}%`].map(csvCell).join(','))
-    }
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(new Blob([`﻿${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' }))
-    link.download = `attendance-${range.from}-to-${range.to}.csv`
-    link.click()
-    URL.revokeObjectURL(link.href)
+    downloadCSV(`attendance-${range.from}-to-${range.to}.csv`, [
+      [t('students.id'), t('students.fullName'), t('attendance.status.present'), t('attendance.status.late'), t('attendance.status.absent'), t('attendance.status.excused'), t('attendance.col.rate')],
+      ...rows.map((row) => {
+        const rate = attendanceRate(row)
+        return [row.student_number, row.student_name, row.present, row.late, row.absent, row.excused, rate === null ? '' : `${rate}%`]
+      }),
+    ])
   }
   return <section className="panel">
     <div className="panel-head">

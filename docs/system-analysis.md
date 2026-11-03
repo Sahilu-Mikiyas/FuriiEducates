@@ -102,7 +102,20 @@ Limits: the mock day has one timetable for all chosen classes, with no rooms or 
 
 Limits: attendance is daily per class, not per period, and staff attendance is not built. Nothing is sent to parents yet: the call list stands in until an SMS provider is chosen. A guardian belongs to one student, so a parent of two children has two records until the parent portal links them. Register dates use the device's date, and a wrong clock on a phone would mark the wrong day. Import row errors and other server validation messages are still in English on the Amharic screens. Admissions, documents, photos, ID cards and promotion are not built. No file of a whole school's size has been imported, and the import has not been timed against the hosted database.
 
-Next in core operations: continuous assessment and report cards, then the parent portal and SMS.
+**2026-11-03 — Marks and report cards built.**
+
+- An administrator sets the terms of each academic year, adds subjects to a whole grade at once, names each subject's teacher, and sets the pass mark and grade bands. The starting bands are placeholders and are flagged until the school saves its own.
+- A subject's teacher adds tests with a share of the total and a maximum mark, then enters marks in a grid that takes the arrow keys and pastes from a spreadsheet. A blank is a missing mark, never a zero. Shares cannot pass 100, and marks cannot pass a test's maximum. A change to an existing mark is logged with both values.
+- Teachers see how many marks are missing per subject. The roster shows every student's subject totals, total, average, grade and rank, with ties sharing a rank. A student with a missing mark has no average or rank. A subject can be left out of the average.
+- Report cards add attendance from the term's dates, conduct and a teacher's comment. Cards before publishing are marked as drafts.
+- Only an administrator publishes. Publishing locks the term's marks and keeps a copy of each card, so an issued card does not change when grade bands change or a student moves. Shares that do not add to 100 stop publishing outright, and missing marks need confirming. Taking reports back needs a reason, which is logged, and runs latest term first because a later card carries the earlier figures.
+- A later term's card shows the earlier published terms with a year average and rank. Students see their own published cards.
+- Cards and rosters print, or save as PDF, through the browser: one A4 page per card, and the roster on a landscape page. Names of subjects and terms appear as the school typed them, and the rest follows the language of the person printing.
+- Migration 00020 adds the tables. New API tests cover all of this, including isolation between schools. The whole flow ran in Edge against a production build, in English and Amharic and at phone width, from setup through two semesters. Printed pages were generated and checked. A review also found and fixed a server error for a teacher outside a class opening a subject with no named teacher.
+
+Limits: the default grade bands have not been checked against Ministry or regional rules. Promotion decisions and transcripts are not built, so a card makes no pass or fail statement beyond marking totals below the pass mark. Marks are entered by hand or pasted, and online exam scores do not flow into them yet. A report covers the students now in the class, so a student who moves mid-term has missing marks in the new class and no card from the old one for that term. Subject averages are unweighted across subjects. Any teacher of the class can write conduct and comments, because there is no homeroom teacher role yet. Printing depends on the device's browser and has only been tested in Edge. Server validation messages are still in English on Amharic screens, and the Amharic text is a draft that needs a native speaker's review.
+
+Next in core operations: the parent portal and SMS, which need an SMS provider chosen.
 
 ---
 

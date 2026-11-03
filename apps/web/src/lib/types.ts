@@ -7,6 +7,23 @@ export type School = { id: string; name: string; timezone: string; default_langu
 export type Year = { id: string; name: string; starts_on: string; ends_on: string }
 export type ClassRoom = { id: string; name: string; grade_level: string; academic_year_id: string; academic_year_name?: string }
 export type Student = { id: string; student_number: string; legal_name: string; preferred_language: string; status: string; has_account: boolean; stream?: string; class_id?: string; class_name?: string; grade_level?: string }
+export type Term = { id: string; academic_year_id: string; academic_year_name: string; name: string; starts_on: string; ends_on: string; in_use: boolean }
+export type GradeBand = { label: string; min_percent: number }
+export type ReportSettings = { pass_percent: number; grade_bands: GradeBand[]; custom: boolean }
+export type ClassSubject = { id: string; name: string; teacher_id: string; teacher_name: string; counts_in_average: boolean; can_edit: boolean; items: number; weight_total: number; missing_marks: number }
+export type MarkSheetItem = { id: string; title: string; weight: number; max_score: number }
+export type MarkSheetData = { subject_name: string; can_edit: boolean; published: boolean; weight_total: number; items: MarkSheetItem[]; students: { student_id: string; student_number: string; student_name: string; in_class: boolean; scores: Record<string, number> }[] }
+export type ReportCardData = {
+  student_id: string; student_number: string; student_name: string; school_name: string; class_name: string; grade_level: string; year_name: string; term_id: string; term_name: string; pass_percent: number
+  subjects: { subject_id: string; name: string; total: number | null; grade: string; counts_in_average: boolean; earlier?: Record<string, number | null>; year_average?: number | null }[]
+  total: number | null; average: number | null; grade: string; rank: number | null; students_ranked: number; complete: boolean
+  attendance: { days_marked: number; present: number; absent: number; late: number; excused: number }
+  conduct: string; comment: string
+  earlier_terms: { term_id: string; name: string; average: number | null; rank: number | null }[]
+  year_average?: number | null; year_rank?: number | null
+}
+export type ReportProblem = { kind: 'no_items' | 'weights' | 'missing_marks'; subject_id: string; subject: string; weight_total?: number; missing_marks?: number }
+export type ClassReportData = { published: boolean; published_at: string; cards: ReportCardData[]; problems: ReportProblem[] }
 export type Guardian = { id: string; full_name: string; relationship: string; phone: string; email: string; is_primary: boolean }
 export type AttendanceSummaryData = { days_marked: number; present: number; absent: number; late: number; excused: number; recent: { date: string; status: string; note: string }[] }
 export type StudentProfileData = {

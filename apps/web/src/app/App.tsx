@@ -20,6 +20,9 @@ const OverviewPage = lazy(() => import('../pages/admin/OverviewPage'))
 const StudentsPage = lazy(() => import('../pages/admin/StudentsPage'))
 const AttendancePage = lazy(() => import('../pages/admin/AttendancePage'))
 const StudentProfile = lazy(() => import('../features/students/StudentProfile'))
+const ReportSetupPage = lazy(() => import('../pages/admin/ReportSetupPage'))
+const AdminMarksPage = lazy(() => import('../pages/admin/MarksPage').then((m) => ({ default: m.AdminMarksPage })))
+const AdminReportCardsPage = lazy(() => import('../pages/admin/MarksPage').then((m) => ({ default: m.AdminReportCardsPage })))
 const ClassesPage = lazy(() => import('../pages/admin/ClassesPage'))
 const AcademicHistoryPage = lazy(() => import('../pages/admin/AcademicHistoryPage'))
 const CurriculumPage = lazy(() => import('../pages/admin/CurriculumPage'))
@@ -34,6 +37,8 @@ const MockDaysPage = lazy(() => import('../features/prep/MockDays').then((m) => 
 const TeacherLayout = lazy(() => import('../pages/teacher/TeacherLayout'))
 const ClassPage = lazy(() => import('../pages/teacher/ClassPage'))
 const TeacherAttendancePage = lazy(() => import('../pages/teacher/AttendancePage'))
+const TeacherMarksPage = lazy(() => import('../pages/teacher/MarksPages').then((m) => ({ default: m.TeacherMarksPage })))
+const TeacherReportCardsPage = lazy(() => import('../pages/teacher/MarksPages').then((m) => ({ default: m.TeacherReportCardsPage })))
 const teacherPage = (name: 'TeacherReadinessPage' | 'TeacherSessionsPage' | 'TeacherGradebookPage' | 'TeacherAnswersPage' | 'TeacherPlanningPage' | 'TeacherAccountPage') =>
   lazy(() => import('../pages/teacher/pages').then((m) => ({ default: m[name] })))
 const TeacherSessionsPage = teacherPage('TeacherSessionsPage')
@@ -47,6 +52,7 @@ const LearnerLayout = lazy(() => learnerWorkspace().then((m) => ({ default: m.Le
 const LearnerHome = lazy(() => learnerWorkspace().then((m) => ({ default: m.LearnerHome })))
 const ExamRoute = lazy(() => learnerWorkspace().then((m) => ({ default: m.ExamRoute })))
 const LearnerAccountPage = lazy(() => learnerWorkspace().then((m) => ({ default: m.LearnerAccountPage })))
+const LearnerReports = lazy(() => learnerWorkspace().then((m) => ({ default: m.LearnerReports })))
 const PrepHome = lazy(() => learnerWorkspace().then((m) => ({ default: m.PrepHome })))
 const PrepSessionRoute = lazy(() => learnerWorkspace().then((m) => ({ default: m.PrepSessionRoute })))
 const ComputerSkills = lazy(() => learnerWorkspace().then((m) => ({ default: m.ComputerSkills })))
@@ -114,6 +120,9 @@ export function App() {
         <Route path="mock-days" element={<MockDaysPage />} />
         <Route path="exam-sessions" element={<ExamSessions />} />
         <Route path="results" element={<ResultsPage />} />
+        <Route path="marks" element={<AdminMarksPage />} />
+        <Route path="report-cards" element={<AdminReportCardsPage />} />
+        <Route path="report-setup" element={<ReportSetupPage />} />
         <Route path="finance" element={<FinanceWorkspace />} />
         <Route path="lesson-plans" element={<LessonPlanReview />} />
         <Route path="staff" element={<StaffPage />} />
@@ -125,6 +134,8 @@ export function App() {
         <Route index element={<Navigate to="class" replace />} />
         <Route path="class" element={<ClassPage />} />
         <Route path="attendance" element={<TeacherAttendancePage />} />
+        <Route path="marks" element={<TeacherMarksPage />} />
+        <Route path="report-cards" element={<TeacherReportCardsPage />} />
         <Route path="students/:studentID" element={<StudentProfile canEdit={false} base="/teach" />} />
         <Route path="exam-sessions" element={<TeacherSessionsPage />} />
         <Route path="gradebook" element={<TeacherGradebookPage />} />
@@ -140,6 +151,7 @@ export function App() {
         <Route index element={<LearnerHome />} />
         <Route path="assessments/:assignmentID" element={<ExamRoute />} />
         <Route path="account" element={<LearnerAccountPage />} />
+        <Route path="report-cards" element={<LearnerReports />} />
         <Route path="prep" element={<PrepHome />} />
         <Route path="prep/computer-skills" element={<ComputerSkills />} />
         <Route path="prep/session/:sessionID" element={<PrepSessionRoute />} />

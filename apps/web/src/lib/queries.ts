@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
-import type { AcademicRecord, Assessment, ClassRoom, Curriculum, CurriculumNode, DemoRequest, ExternalExam, LearnerAssignment, LearningSummary, Question, School, SchoolSetupProfile, StaffInvitation, StaffMember, Student, Subject, TeacherLearningRow, TeacherStudent, Year } from './types'
+import type { AcademicRecord, Assessment, ClassRoom, Curriculum, CurriculumNode, DemoRequest, ExternalExam, LearnerAssignment, LearningSummary, Question, School, SchoolSetupProfile, StaffInvitation, StaffMember, Student, Subject, TeacherLearningRow, TeacherStudent, Term, Year } from './types'
 
 // Each hook is one server list or record, cached under its API path so pages
 // share data and a change on one page refreshes the others.
@@ -11,6 +11,7 @@ function useResource<T>(path: string, enabled = true) {
 export const useSchool = () => useResource<School>('/school')
 export const useSetupProfile = () => useResource<SchoolSetupProfile | null>('/school/setup-profile')
 export const useYears = () => useResource<Year[]>('/academic-years')
+export const useTerms = () => useResource<Term[]>('/terms')
 export const useClasses = () => useResource<ClassRoom[]>('/classes')
 export const useStudents = () => useResource<Student[]>('/students')
 export const useLearningSummary = () => useResource<LearningSummary>('/school/learning-summary')

@@ -308,6 +308,140 @@ paths:
       responses:
         '200': { description: Success }
         '401': { description: Authentication required }
+  /terms:
+    get:
+      summary: "Terms of the school's academic years (staff)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    post:
+      summary: "Add a term inside its academic year, not overlapping another (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /terms/{termID}:
+    put:
+      summary: "Change a term (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    delete:
+      summary: "Remove a term with no marks or reports (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /report-settings:
+    get:
+      summary: "Pass mark and grade bands (staff)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    put:
+      summary: "Change the pass mark and grade bands (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /classes/{classID}/subjects:
+    get:
+      summary: "A class's subjects. With term_id, also tests, weight total and missing marks (administrator or teacher of the class)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /class-subjects:
+    post:
+      summary: "Add subjects to classes. A class that has a subject keeps it (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /class-subjects/{subjectID}:
+    put:
+      summary: "Change a subject's name, teacher and place in the average (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    delete:
+      summary: "Remove a subject with no tests (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /marks:
+    get:
+      summary: "Tests and marks for a subject and term (administrator or teacher of the class)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    put:
+      summary: "Save marks. A null score clears a mark. Locked once reports are published (administrator or the subject's teacher)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /marks/items:
+    post:
+      summary: "Add a test. A subject's weights in a term cannot pass 100 (administrator or the subject's teacher)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+  /marks/items/{itemID}:
+    put:
+      summary: "Change a test (administrator or the subject's teacher)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    delete:
+      summary: "Remove a test. with_marks=true is needed if it has marks (administrator or the subject's teacher)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /report-cards/classes/{classID}:
+    get:
+      summary: "A class's cards and what is not ready for a term. Published copies once published (administrator or teacher of the class)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /report-cards/classes/{classID}/notes:
+    put:
+      summary: "Save conduct and comments (administrator or teacher of the class)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /report-cards/classes/{classID}/publish:
+    post:
+      summary: "Issue reports: locks marks and keeps a copy of each card. allow_incomplete passes missing marks, never wrong weights (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /report-cards/classes/{classID}/unpublish:
+    post:
+      summary: "Take reports back with a reason, latest term first (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /student/report-cards:
+    get:
+      summary: "The student's own published cards, newest first"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
   /demo-requests:
     post:
       summary: Submit a public school setup request

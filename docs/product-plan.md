@@ -165,7 +165,7 @@ Status key: **Exists**, **Partial**, **New**. Each module lists the operations a
 - **Operations:** lesson plans (exists), class resources (exists), homework and assignments, submissions, feedback, curriculum coverage tracking, department planning.
 - **Automate:** homework reminders, late-submission tracking, coverage reports comparing plans to the syllabus, and copying plans to the next year.
 
-### 3.7 Assessment, grading and report cards (Partial)
+### 3.7 Assessment, grading and report cards (Partial: marks, weighting, grade bands, rosters, rank, report cards and missing-mark counts are built; transcripts and promotion are not)
 - **Operations:** continuous assessment (tests, quizzes, assignments, projects), mark entry, weighting rules, grade rosters, ranking, report cards, transcripts, promotion decisions.
 - **Automate:**
   - weighted totals and grades from the school's rules;

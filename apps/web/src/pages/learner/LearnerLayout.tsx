@@ -29,6 +29,7 @@ export default function LearnerLayout({ identity }: { identity: Identity }) {
       <nav className="workspace-nav" aria-label={t('learner.navLabel')}>
         <NavLink end to="/learn" className={({ isActive }) => (isActive ? 'active' : '')}>{t('learner.home')}</NavLink>
         <NavLink to="/learn/prep" className={({ isActive }) => (isActive ? 'active' : '')}>{t('prep.nav')}</NavLink>
+        <NavLink to="/learn/report-cards" className={({ isActive }) => (isActive ? 'active' : '')}>{t('reports.studentNav')}</NavLink>
         <NavLink to="/learn/account" className={({ isActive }) => (isActive ? 'active' : '')}>{t('teacher.nav.account')}</NavLink>
       </nav>
       <p className="nav-heading">{t('learner.heading')}</p>

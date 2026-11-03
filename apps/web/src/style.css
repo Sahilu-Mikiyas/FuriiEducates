@@ -451,3 +451,77 @@ footer span{color:#1d4ed8}
   .register-marks{grid-template-columns:repeat(4,minmax(0,1fr))}
   .attendance-counts{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+/* Marks and report cards */
+.marks-class{display:block;margin-top:18px}
+.selected-row td{background:#f6f8ff}
+.mark-items{display:grid;gap:12px;margin-bottom:14px}
+.mark-item-form{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto;align-items:end;gap:10px;flex:1 1 100%;min-width:0}
+.mark-item-form label{display:grid;gap:4px;min-width:0;color:#41534b;font-size:12px;font-weight:600}
+.mark-item-form input{width:100%;min-height:38px;padding:7px 10px;border:1px solid #d9dedb;border-radius:6px;background:#fff;font:inherit;font-size:13px;font-weight:400}
+.marks-grid th small{display:block;font-size:11px;font-weight:400;text-transform:none}
+.marks-grid td input{width:72px;min-height:38px;padding:6px 8px;border:1px solid #d9dedb;border-radius:6px;background:#fff;font:inherit;font-size:13px;text-align:right}
+.marks-grid td input:disabled{background:#f6f7f6;color:#555}
+.marks-grid td input.mark-invalid{border-color:#b91c1c;background:#fee2e2}
+.marks-grid td:first-child small{display:block}
+.report-problems ul{margin:0 0 12px;padding-left:18px;font-size:13px}
+.report-problems li.row-error{margin:0}
+.report-actions{position:static}
+.link-button{padding:0;border:0;background:none;color:#1d4ed8;font:inherit;font-weight:600;text-align:left;text-decoration:underline;cursor:pointer}
+.roster-table small{display:block;color:#666;font-size:11px}
+.below-pass{color:#b91c1c;font-weight:600}
+.report-notes{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:0;padding:0;list-style:none}
+.report-notes li{display:grid;grid-template-columns:minmax(120px,1fr) 110px minmax(0,2fr);align-items:center;gap:8px;font-size:13px}
+.report-notes select,.report-notes input{width:100%;min-height:38px;padding:7px 10px;border:1px solid #d9dedb;border-radius:6px;background:#fff;font:inherit;font-size:13px}
+.grade-bands{display:grid;gap:8px;max-width:420px;margin-bottom:12px}
+.grade-bands label{display:grid;gap:4px;color:#41534b;font-size:12px;font-weight:600}
+.grade-bands input{width:100%;min-height:38px;padding:7px 10px;border:1px solid #d9dedb;border-radius:6px;background:#fff;font:inherit;font-size:13px;font-weight:400}
+.grade-band{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px}
+.report-card{display:grid;gap:12px;padding:16px;border:1px solid #e3e6e4;border-radius:8px;background:#fff;color:#111;font-size:13px}
+.report-card-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;padding-bottom:10px;border-bottom:2px solid #111}
+.report-card-head h2{margin:0;font-size:18px}
+.report-card-head p{margin:2px 0 0;color:#444}
+.report-card-term{display:grid;gap:2px;text-align:right}
+.report-draft{margin:0;padding:6px 10px;border-radius:6px;background:#fef3c7;color:#713f12;font-size:12px;font-weight:600}
+.report-incomplete{margin:0 0 10px;padding:8px 10px;border-radius:6px;background:#fef3c7;color:#713f12;font-size:12px}
+.report-card .report-incomplete{margin:0}
+.report-card-who{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:0}
+.report-card-who dt{color:#555;font-size:11px}
+.report-card-who dd{margin:1px 0 0;font-weight:600;overflow-wrap:anywhere}
+.report-card-table{width:100%;border-collapse:collapse}
+.report-card-table th,.report-card-table td{padding:6px 8px;border:1px solid #d9dedb;font-size:12px;text-align:left}
+.report-card-table thead th{background:#f3f4f3;color:#222;text-transform:none;letter-spacing:0}
+.report-card-table tfoot th{background:#f8f8f8;color:#222;text-transform:none;letter-spacing:0;font-weight:600}
+.report-card-table small{color:#666;font-size:11px}
+.report-card-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.report-card-facts h3{margin:0 0 2px;font-size:12px}
+.report-card-facts p{margin:0;overflow-wrap:anywhere}
+.report-card-comment{grid-column:1/-1}
+.report-card-signs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:18px;margin-top:22px}
+.report-card-signs span{padding-top:5px;border-top:1px solid #111;font-size:11px}
+.report-card-foot{margin:0;color:#555;font-size:11px}
+.panel-head>.status-pill{white-space:nowrap}
+.report-card-table{min-width:0}
+.print-root{display:none}
+.print-roster h2{margin:0;font-size:16px}
+.print-roster p{margin:2px 0 8px;font-size:12px}
+.print-roster table{width:100%;border-collapse:collapse}
+.print-roster th,.print-roster td{padding:3px 5px;border:1px solid #999;color:#111;font-size:11px;text-align:left;text-transform:none;letter-spacing:0}
+.print-roster small{display:block;font-size:11px}
+.print-roster tbody tr:last-child td{border-bottom:1px solid #999}
+.print-roster .link-button{color:#111;font-weight:400;text-decoration:none}
+@media(max-width:700px){
+  .mark-item-form,.report-notes li{grid-template-columns:minmax(0,1fr)}
+  .report-card{padding:10px}
+  .report-card-table th,.report-card-table td{padding:5px 4px;overflow-wrap:anywhere;white-space:normal}
+}
+@page roster{size:A4 landscape;margin:10mm}
+@media print{
+  body>:not(.print-root){display:none!important}
+  body{background:#fff}
+  .print-root{display:block}
+  .print-root .report-card{margin:0;padding:0;border:0;border-radius:0;break-after:page;break-inside:avoid}
+  .print-root .report-card:last-child{break-after:auto}
+  .print-root .table-wrap{overflow:visible}
+  .print-root .print-roster{page:roster}
+}
