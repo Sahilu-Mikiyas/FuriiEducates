@@ -515,6 +515,9 @@ footer span{color:#1d4ed8}
   .report-card{padding:10px}
   .report-card-table th,.report-card-table td{padding:5px 4px;overflow-wrap:break-word;white-space:normal}
 }
+.loading>div{max-width:420px;padding:0 20px;text-align:center}
+.loading p{margin:0}
+.loading-wait{margin-top:10px!important;font-size:13px;line-height:1.5}
 /* Parent portal */
 .guardian-access{flex:1 1 100%;min-width:0}
 .guardian-access .inline-form{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;margin:0}

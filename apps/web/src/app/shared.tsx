@@ -1,4 +1,4 @@
-import { Component, ReactNode } from 'react'
+import { Component, ReactNode, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { languages, Language, useI18n } from '../i18n'
 import type { Identity } from '../lib/types'
@@ -21,9 +21,31 @@ export function LanguageSwitch() {
   </label>
 }
 
+const OPENING_SLOW_MS = 4000
+let openingSince = 0
+let openingEnded = 0
+
+// Loading covers the wait for the app to open. On the free hosting plan the API
+// sleeps when idle and takes up to a minute to wake, so a long wait explains
+// itself. Opening can pass through several of these screens, and they count as one.
 export function Loading() {
   const { t } = useI18n()
-  return <main className="loading">{t('common.opening')}</main>
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    const now = Date.now()
+    if (now - openingEnded > 1000) openingSince = now
+    const timer = window.setTimeout(() => setSlow(true), Math.max(0, OPENING_SLOW_MS - (now - openingSince)))
+    return () => {
+      window.clearTimeout(timer)
+      openingEnded = Date.now()
+    }
+  }, [])
+  return <main className="loading" role="status">
+    <div>
+      <p>{t('common.opening')}</p>
+      {slow && <p className="loading-wait">{t('common.openingSlow')}</p>}
+    </div>
+  </main>
 }
 
 export function PageLoading() {

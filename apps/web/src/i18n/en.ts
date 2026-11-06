@@ -1343,6 +1343,7 @@ export const en = {
   'quiz.notCorrect': 'Not correct',
   'quiz.yourAnswer': 'Your answer: {answer}',
   'quiz.correctAnswer': 'Correct answer: {answer}',
+  'common.openingSlow': 'Still opening. The school service may be waking up, which can take up to a minute. Please keep this page open.',
   'status.active': 'active',
   'status.inactive': 'inactive',
   'status.disabled': 'disabled',

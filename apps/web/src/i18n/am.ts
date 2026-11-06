@@ -1345,6 +1345,7 @@ export const am: Record<keyof typeof en, string> = {
   'quiz.notCorrect': 'ትክክል አይደለም',
   'quiz.yourAnswer': 'የእርስዎ መልስ፦ {answer}',
   'quiz.correctAnswer': 'ትክክለኛ መልስ፦ {answer}',
+  'common.openingSlow': 'አሁንም በመክፈት ላይ ነው። የትምህርት ቤቱ አገልግሎት እየተነሳ ሊሆን ይችላል፤ እስከ አንድ ደቂቃ ሊወስድ ይችላል። እባክዎ ይህን ገጽ ክፍት ያድርጉ።',
   'status.active': 'ንቁ',
   'status.inactive': 'ንቁ ያልሆነ',
   'status.disabled': 'የታገደ',

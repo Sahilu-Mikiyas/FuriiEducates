@@ -150,6 +150,8 @@ Limits: most schools will see little here until they have published a report car
 
 Limits: questions are plain text, with no pictures or maths formatting, which will matter for maths and science. There is one correct choice per question, no question reuse beyond copying a whole quiz, and no retakes. Students answer online: paper or photo hand-ins are not built, so paper work still goes into marks by hand. A quiz with no due date shows its answers straight after submitting, so classmates could share them. A quiz topic is separate from the same-named topic in exam practice, so practice is only offered for exam practice topics. Administrators can attach a class's worksheet but only teachers can upload one. Nothing notifies students or parents when work is set.
 
+**2026-11-03 — Waking-up message.** The API sleeps after about 15 idle minutes on Render's free plan, and the first visitor then waits up to a minute on the opening screen, which looked frozen. After 4 seconds that screen now explains the wait. This does not shorten it: an uptime ping would, and a paid plan is needed before any pilot.
+
 Next: SMS and phone sign-in, which wait on choosing a provider, and pictures in questions.
 
 ---
