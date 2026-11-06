@@ -5,6 +5,7 @@ import { useFeedback, Toast } from '../../app/feedback'
 import { useOnline } from '../../app/pwa'
 import { SESSION_KEY, useLogout } from '../../app/session'
 import { Brand, LanguageSwitch } from '../../app/shared'
+import { NotificationBell } from '../../features/notifications/notifications'
 import { useI18n } from '../../i18n'
 import { useLearnerAssignments } from '../../lib/queries'
 import type { Identity } from '../../lib/types'
@@ -47,7 +48,7 @@ export default function LearnerLayout({ identity }: { identity: Identity }) {
       </div>
     </aside>
     <main className="learner-main">
-      <header className="teacher-topbar"><span>{t('learner.workspace')}</span><strong>{identity.display_name}</strong></header>
+      <header className="teacher-topbar"><span>{t('learner.workspace')}</span><span className="topbar-person"><NotificationBell base="/learn" /><strong>{identity.display_name}</strong></span></header>
       <div className="learner-content">
         {!online && <p className="offline-banner" role="status">{t('offline.banner')} <Link to="/learn/prep">{t('offline.bannerLink')}</Link></p>}
         <Toast />

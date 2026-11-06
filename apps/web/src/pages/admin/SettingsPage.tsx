@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAction } from '../../app/feedback'
 import { SESSION_KEY } from '../../app/session'
 import { ChangePasswordPanel, PreferencesPanel } from '../../features/account/account'
+import { NotificationSettingsPanel } from '../../features/notifications/notifications'
 import { languages, useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { useRefresh, useSchool, useSetupProfile } from '../../lib/queries'
@@ -42,6 +43,7 @@ export default function SettingsPage() {
         <button className="secondary" disabled={busy}>{t('settings.save')}</button>
       </form>}
     </section>
+    <NotificationSettingsPanel />
     <PreferencesPanel />
     <ChangePasswordPanel />
   </>

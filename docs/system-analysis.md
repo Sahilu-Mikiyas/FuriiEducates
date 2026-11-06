@@ -170,6 +170,37 @@ Still open from the audit: archiving whole exams and editing past results in pla
 
 Next: notifications, then year-end rollover and promotion, then named roles.
 
+**2026-11-06 — Pilot readiness, part 2: notifications.**
+
+- Every account has an inbox under a bell in the top bar, with an unread count. Notices are written when read, in the language the app is showing, English or Amharic (dates in the Ethiopian calendar).
+- Automatic notices, all inside the change that causes them:
+  - absences: the families of a student marked absent today. They wait 10 minutes so a corrected register can take them back, and registers for other days send nothing;
+  - report cards: students and families, when they are published;
+  - schoolwork: students, when a quiz or assignment is published, with a reminder the day before it is due for anyone who has not handed in.
+- Invitations and password reset links are emailed when email is set up. The stored copy of a message with a sign-in link is blanked once it is sent or given up, and cannot be retried.
+- Administrators get a Messages page, which has:
+  - announcements to everyone, staff, parents, students, or one class and its parents. Before sending, it shows how many people each channel will reach;
+  - which automatic topics may also go by email, SMS or Telegram;
+  - the state of each channel, a test send, and a log of the last 100 messages with retry.
+- Each person chooses the language of their messages, turns channels off, mutes topics outside the app, sets an SMS number, and connects Telegram by pressing Start in the school's bot.
+- Channels, set on the API server:
+  - email through Resend (`RESEND_API_KEY`, `EMAIL_FROM`). Render's free plan blocks SMTP, which is supported for paid plans;
+  - SMS through AfroMessage (`SMS_PROVIDER=afromessage`, `AFROMESSAGE_TOKEN`, optional sender name and identifier) or any HTTPS webhook;
+  - Telegram through a bot (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`);
+  - `PUBLIC_WEB_URL` for the links in messages.
+- Without a channel, everything still appears in the app, and outside messages are logged as not sent. Guardians without an account are reached by SMS on the phone the school recorded.
+- Rules for outside messages:
+  - SMS waits out the night (21:00 to 07:00 school time);
+  - temporary failures are retried after 1, 5, 15 and 60 minutes;
+  - anything more than a day late is dropped;
+  - the same event reaches a person once;
+  - delivery records go after 90 days, read notices after 180.
+- Two API tests run email, SMS and Telegram end to end against fake providers, and the whole flow ran in Edge under the security policy.
+
+Not checked yet: the AfroMessage request format against a real account. It follows AfroMessage's published client libraries. On Render's free plan the API sleeps, so a queued message waits until it wakes; the uptime ping fixes this too.
+
+Next: year-end rollover and promotion, then named roles.
+
 ---
 
 ## 1. What the system is today

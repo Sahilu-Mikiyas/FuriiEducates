@@ -132,3 +132,26 @@ export type StudentMockRound = { id: string; name: string; total?: number; paper
 
 export type ClassOption = { id: string; name: string; grade_level: string }
 export const classLabel = (classroom: Pick<ClassOption, 'grade_level' | 'name'>) => `${classroom.grade_level} · ${classroom.name}`
+
+export type NoticeTopic = 'attendance' | 'reports' | 'schoolwork' | 'announcements' | 'account'
+export type NoticeChannel = 'email' | 'sms' | 'telegram'
+export type NotificationItem = { id: string; topic: NoticeTopic; kind: string; title: string; body: string; link: string; created_at: string; read: boolean }
+export type NotificationInbox = { items: NotificationItem[]; unread: number }
+export type ChannelState = { channel: NoticeChannel; ready: boolean; provider: string }
+export type NotificationSettings = {
+  language: 'en' | 'am'; email_enabled: boolean; sms_enabled: boolean; telegram_enabled: boolean; muted_topics: NoticeTopic[]
+  email: string; phone: string; telegram_connected: boolean; channels: ChannelState[]
+}
+export type NotificationOverview = {
+  channels: ChannelState[]; links_ready: boolean; rules: Record<NoticeChannel, NoticeTopic[]>
+  last_30_days: { channel: NoticeChannel; status: string; count: number }[]; sms_this_month: number
+}
+export type Delivery = {
+  id: string; channel: NoticeChannel; address: string; topic: NoticeTopic; kind: string; subject: string; body: string
+  status: 'pending' | 'sending' | 'sent' | 'failed' | 'cancelled' | 'skipped'; attempts: number; error: string; created_at: string; sent_at?: string; name: string
+}
+export type Announcement = {
+  id: string; title: string; body: string; audience: string; class_name: string; channels: NoticeChannel[]; recipients: number
+  created_at: string; sent_by: string; deliveries: Record<string, number>
+}
+export type AnnouncementResult = { id: string; recipients: number; channels: Partial<Record<NoticeChannel, Record<string, number>>>; dry_run: boolean }

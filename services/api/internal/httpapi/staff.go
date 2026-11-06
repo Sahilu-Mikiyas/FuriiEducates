@@ -156,6 +156,11 @@ func (a *API) createStaffInvitation(w http.ResponseWriter, r *http.Request, id a
 		a.serverError(w, r, err)
 		return
 	}
+	emailed, err := a.queueAccountEmail(r.Context(), tx, id.SchoolID, "account.staff_invite", email, "#invite="+token, expiresAt)
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
 	_, err = tx.Exec(r.Context(), `INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'staff.invited','staff_invitation',$3,jsonb_build_object('email',$4::text,'role','teacher'))`, id.SchoolID, id.UserID, invitationID, email)
 	if err != nil {
 		a.serverError(w, r, err)
@@ -167,7 +172,7 @@ func (a *API) createStaffInvitation(w http.ResponseWriter, r *http.Request, id a
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"data": map[string]any{
 		"id": invitationID, "email": email, "role": "teacher", "token": token,
-		"expires_at": expiresAt.Format(time.RFC3339),
+		"expires_at": expiresAt.Format(time.RFC3339), "emailed": emailed,
 	}})
 }
 

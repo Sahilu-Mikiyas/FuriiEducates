@@ -30,6 +30,8 @@ const CurriculumPage = lazy(() => import('../pages/admin/CurriculumPage'))
 const AssessmentsPage = lazy(() => import('../pages/admin/AssessmentsPage'))
 const ResultsPage = lazy(() => import('../pages/admin/ResultsPage'))
 const StaffPage = lazy(() => import('../pages/admin/StaffPage'))
+const MessagesPage = lazy(() => import('../pages/admin/MessagesPage'))
+const NotificationsPage = lazy(() => import('../features/notifications/notifications').then((m) => ({ default: m.NotificationsPage })))
 const SetupRequestsPage = lazy(() => import('../pages/admin/SetupRequestsPage'))
 const SettingsPage = lazy(() => import('../pages/admin/SettingsPage'))
 const ExamPrepPage = lazy(() => import('../pages/admin/ExamPrepPage'))
@@ -136,6 +138,8 @@ export function App() {
         <Route path="finance" element={<FinanceWorkspace />} />
         <Route path="lesson-plans" element={<LessonPlanReview />} />
         <Route path="staff" element={<StaffPage />} />
+        <Route path="messages" element={<MessagesPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="demo-requests" element={<OperatorOnly><SetupRequestsPage /></OperatorOnly>} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/admin/overview" replace />} />
@@ -156,12 +160,14 @@ export function App() {
         <Route path="exam-questions" element={<QuestionBankPage />} />
         <Route path="mock-days" element={<MockDaysPage />} />
         <Route path="account" element={<TeacherAccountPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="*" element={<Navigate to="/teach/class" replace />} />
       </Route>
       <Route path="/learn" element={<RequireRole role="student" render={(user) => <LearnerLayout identity={user} />} />}>
         <Route index element={<LearnerHome />} />
         <Route path="assessments/:assignmentID" element={<ExamRoute />} />
         <Route path="account" element={<LearnerAccountPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="report-cards" element={<LearnerReports />} />
         <Route path="prep" element={<PrepHome />} />
         <Route path="prep/computer-skills" element={<ComputerSkills />} />
@@ -174,6 +180,7 @@ export function App() {
         <Route path="children" element={<ParentHome />} />
         <Route path="children/:studentID" element={<ChildPage />} />
         <Route path="account" element={<ParentAccountPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="*" element={<Navigate to="/family/children" replace />} />
       </Route>
       <Route path="*" element={<HomeRedirect />} />

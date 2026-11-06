@@ -132,11 +132,16 @@ func (a *API) writePasswordReset(w http.ResponseWriter, r *http.Request, schoolI
 		a.serverError(w, r, err)
 		return
 	}
+	emailed, err := a.queueAccountEmail(r.Context(), tx, schoolID, "account.password_reset", email, "#reset="+token, expires)
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
 	if err = tx.Commit(r.Context()); err != nil {
 		a.serverError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"data": map[string]string{"email": email, "token": token, "expires_at": expires.Format(time.RFC3339)}})
+	writeJSON(w, http.StatusCreated, map[string]any{"data": map[string]any{"email": email, "token": token, "expires_at": expires.Format(time.RFC3339), "emailed": emailed}})
 }
 
 // createStaffPasswordReset issues a reset link for a teacher or another

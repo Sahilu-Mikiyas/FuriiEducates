@@ -4,6 +4,7 @@ import { Toast, useFeedback } from '../../app/feedback'
 import { useLogout } from '../../app/session'
 import { Brand, LanguageSwitch, PageLoading, WorkspaceLinks } from '../../app/shared'
 import { useDates } from '../../calendar/useDates'
+import { NotificationBell } from '../../features/notifications/notifications'
 import { useI18n } from '../../i18n'
 import { useSchool, useStudents } from '../../lib/queries'
 import type { Identity } from '../../lib/types'
@@ -22,7 +23,7 @@ export default function AdminLayout({ identity }: { identity: Identity }) {
   useEffect(() => { clear(); window.scrollTo({ top: 0, behavior: 'auto' }) }, [pathname, clear])
 
   const slug = pathname.replace(/^\/admin\/?/, '').split('/')[0]
-  const page = (adminPages.some((item) => item.id === slug) ? slug : 'overview') as AdminPageID
+  const page = (adminPages.some((item) => item.id === slug) || slug === 'notifications' ? slug : 'overview') as AdminPageID | 'notifications'
   const visible = adminPages.filter((item) => item.id !== 'demo-requests' || identity.platform_operator)
   const initial = identity.display_name.slice(0, 1).toUpperCase()
 
@@ -52,6 +53,7 @@ export default function AdminLayout({ identity }: { identity: Identity }) {
       <header className="topbar">
         <span>{t('admin.workspaceCrumb')} <b>/</b> {t(`admin.nav.${page}`)}</span>
         <div className="top-actions">
+          <NotificationBell base="/admin" />
           <LanguageSwitch />
           <div className="user-avatar small">{initial}</div>
           <button className="topbar-signout" onClick={() => void logout()}>{t('common.signOut')}</button>

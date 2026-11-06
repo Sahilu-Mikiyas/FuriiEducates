@@ -99,6 +99,11 @@ func (a *API) inviteGuardian(w http.ResponseWriter, r *http.Request, id auth.Ide
 		a.serverError(w, r, err)
 		return
 	}
+	emailed, err := a.queueAccountEmail(r.Context(), tx, id.SchoolID, "account.parent_invite", email, "#parent-invite="+token, expires)
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
 	if err = auditGuardian(r.Context(), tx, id, "guardian.invited", studentID); err != nil {
 		a.serverError(w, r, err)
 		return
@@ -107,7 +112,7 @@ func (a *API) inviteGuardian(w http.ResponseWriter, r *http.Request, id auth.Ide
 		a.serverError(w, r, err)
 		return
 	}
-	writeJSON(w, 201, map[string]any{"data": map[string]any{"linked": false, "email": email, "token": token, "expires_at": expires.Format(time.RFC3339)}})
+	writeJSON(w, 201, map[string]any{"data": map[string]any{"linked": false, "email": email, "token": token, "expires_at": expires.Format(time.RFC3339), "emailed": emailed}})
 }
 
 func (a *API) linkExistingGuardian(w http.ResponseWriter, r *http.Request, id auth.Identity, tx pgx.Tx, studentID, guardianID, userID, status string, isStudent bool) {

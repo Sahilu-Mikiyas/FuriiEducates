@@ -1,4 +1,5 @@
 import { ChangePasswordPanel, PreferencesPanel } from '../../features/account/account'
+import { NotificationSettingsPanel } from '../../features/notifications/notifications'
 import { ExamSessions } from '../../features/exams/ExamSessions'
 import { Gradebook } from '../../features/exams/Gradebook'
 import { GradingQueue } from '../../features/exams/GradingQueue'
@@ -36,5 +37,5 @@ export function TeacherPlanningPage() {
 }
 
 export function TeacherAccountPage() {
-  return <><PreferencesPanel /><ChangePasswordPanel /></>
+  return <><NotificationSettingsPanel /><PreferencesPanel /><ChangePasswordPanel /></>
 }

@@ -669,6 +669,10 @@ func (a *API) publishReports(w http.ResponseWriter, r *http.Request, id auth.Ide
 		a.serverError(w, r, err)
 		return
 	}
+	if err = a.noticeReports(r.Context(), tx, id.SchoolID, req.TermID, students); err != nil {
+		a.serverError(w, r, err)
+		return
+	}
 	if _, err = tx.Exec(r.Context(), `INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'reports.published','class',$3,jsonb_build_object('term_id',$4::text,'cards',$5::int,'problems',$6::int))`, id.SchoolID, id.UserID, classID, req.TermID, len(cards), len(report.Problems)); err != nil {
 		a.serverError(w, r, err)
 		return

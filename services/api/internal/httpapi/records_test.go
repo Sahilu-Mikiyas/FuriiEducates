@@ -229,3 +229,19 @@ func TestRequestsAreLoggedWithoutDetails(t *testing.T) {
 		t.Fatalf("the log must not hold IDs or query values: %s", line)
 	}
 }
+
+func TestCancelledRequestsAreNotErrors(t *testing.T) {
+	var logs bytes.Buffer
+	a := &API{log: slog.New(slog.NewTextHandler(&logs, nil))}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	recorder := httptest.NewRecorder()
+	a.serverError(recorder, httptest.NewRequest("GET", "/x", nil).WithContext(ctx), ctx.Err())
+	if recorder.Code != 499 || strings.Contains(logs.String(), "level=ERROR") {
+		t.Fatalf("status %d, logs %q", recorder.Code, logs.String())
+	}
+	a.serverError(httptest.NewRecorder(), httptest.NewRequest("GET", "/x", nil), context.Canceled)
+	if !strings.Contains(logs.String(), "level=ERROR") {
+		t.Fatal("a cancelled database call during a live request must still be logged")
+	}
+}

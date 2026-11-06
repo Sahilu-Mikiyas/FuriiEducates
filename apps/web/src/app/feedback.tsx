@@ -48,11 +48,13 @@ export function useAction() {
   const { setError, setNotice, clear } = useFeedback()
   const [busy, setBusy] = useState(false)
 
-  async function run(work: () => Promise<unknown>, message?: string) {
+  // message may be a function, to word the notice from what the work found.
+  async function run(work: () => Promise<unknown>, message?: string | (() => string)) {
     clear(); setBusy(true)
     try {
       await work()
-      if (message) setNotice(message)
+      const text = typeof message === 'function' ? message() : message
+      if (text) setNotice(text)
       return true
     } catch (e) {
       setError(errorText(e, 'error.generic'))
@@ -62,7 +64,7 @@ export function useAction() {
 
   // onSubmit makes a form handler. `work` receives the form's values and the
   // form resets when the work succeeds.
-  const onSubmit = (work: (values: FormData, form: HTMLFormElement) => Promise<unknown>, message?: string, resetAfter = true) => (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = (work: (values: FormData, form: HTMLFormElement) => Promise<unknown>, message?: string | (() => string), resetAfter = true) => (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const form = event.currentTarget
     void run(async () => {

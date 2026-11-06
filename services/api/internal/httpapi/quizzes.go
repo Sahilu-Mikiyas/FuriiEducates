@@ -695,6 +695,10 @@ func (a *API) publishQuiz(w http.ResponseWriter, r *http.Request, id auth.Identi
 		a.serverError(w, r, err)
 		return
 	}
+	if err = a.noticeSchoolwork(r.Context(), tx, id.SchoolID, assignmentID); err != nil {
+		a.serverError(w, r, err)
+		return
+	}
 	if _, err = tx.Exec(r.Context(), `INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'quiz.published','class',$3,jsonb_build_object('title',$4::text,'questions',$5::int))`, id.SchoolID, id.UserID, quiz.ClassID, quiz.Title, count); err != nil {
 		a.serverError(w, r, err)
 		return

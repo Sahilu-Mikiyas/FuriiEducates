@@ -189,7 +189,7 @@ function ParentAccess({ studentID, guardian, canEdit, refreshAll }: { studentID:
   const [link, setLink] = useState<{ title: string; detail: string; url: string; copied: string } | null>(null)
   const base = `/students/${studentID}/guardians/${guardian.id}`
   const invite = onSubmit(async (f) => {
-    const result = await api<{ linked: boolean; token?: string }>(`${base}/invitation`, { method: 'POST', body: JSON.stringify({ email: f.get('email') }) })
+    const result = await api<{ linked: boolean; token?: string; email: string; emailed?: boolean }>(`${base}/invitation`, { method: 'POST', body: JSON.stringify({ email: f.get('email') }) })
     await refreshAll()
     if (result.linked) {
       setLink(null)
@@ -197,11 +197,12 @@ function ParentAccess({ studentID, guardian, canEdit, refreshAll }: { studentID:
       return
     }
     setLink({ title: t('guardian.inviteLinkFor', { name: guardian.full_name }), detail: t('guardian.inviteLinkDetail'), url: `${window.location.origin}/#parent-invite=${encodeURIComponent(result.token ?? '')}`, copied: t('guardian.inviteCopied') })
-    setNotice(t('guardian.inviteCreated'))
+    setNotice(result.emailed ? t('notify.linkEmailed', { email: result.email }) : t('guardian.inviteCreated'))
   }, undefined, false)
   const reset = () => run(async () => {
-    const result = await api<{ token: string }>(`${base}/password-reset`, { method: 'POST', body: '{}' })
+    const result = await api<{ token: string; email: string; emailed?: boolean }>(`${base}/password-reset`, { method: 'POST', body: '{}' })
     setLink({ title: t('account.resetLinkFor', { name: guardian.full_name }), detail: t('account.resetLinkDetail'), url: passwordResetLink(result.token), copied: t('account.resetLinkCopied') })
+    if (result.emailed) setNotice(t('notify.linkEmailed', { email: result.email }))
   })
   const removeAccess = () => {
     if (!window.confirm(t('guardian.removeAccessConfirm', { name: guardian.full_name }))) return

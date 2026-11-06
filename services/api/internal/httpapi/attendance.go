@@ -178,6 +178,10 @@ func (a *API) saveClassRegister(w http.ResponseWriter, r *http.Request, id auth.
 		a.serverError(w, r, err)
 		return
 	}
+	if err = a.noticeAbsences(r.Context(), tx, id.SchoolID, classID, req.Date, studentIDs, statuses); err != nil {
+		a.serverError(w, r, err)
+		return
+	}
 	if _, err = tx.Exec(r.Context(), `INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'attendance.saved','class',$3,jsonb_build_object('date',$4::text,'count',$5::int))`, id.SchoolID, id.UserID, classID, req.Date, len(req.Records)); err != nil {
 		a.serverError(w, r, err)
 		return

@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useOutletContext } from 'react-router'
 import { Toast, useFeedback } from '../../app/feedback'
 import { useLogout } from '../../app/session'
 import { Brand, LanguageSwitch, PageLoading, WorkspaceLinks } from '../../app/shared'
+import { NotificationBell } from '../../features/notifications/notifications'
 import { MessageKey, useI18n } from '../../i18n'
 import { useTeacherClasses } from '../../lib/queries'
 import { ClassRoom, classLabel, Identity } from '../../lib/types'
@@ -58,7 +59,7 @@ export default function TeacherLayout({ identity }: { identity: Identity }) {
       </div>
     </aside>
     <main className="teacher-main">
-      <header className="teacher-topbar"><span>{t('teacher.workspace')}</span><strong>{identity.display_name}</strong></header>
+      <header className="teacher-topbar"><span>{t('teacher.workspace')}</span><span className="topbar-person"><NotificationBell base="/teach" /><strong>{identity.display_name}</strong></span></header>
       <div className="teacher-content">
         <Toast />
         <p className="eyebrow">{t('teacher.classesHeading')}</p>

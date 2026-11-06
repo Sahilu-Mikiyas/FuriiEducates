@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router'
 import { Toast, useFeedback } from '../../app/feedback'
 import { useLogout } from '../../app/session'
 import { Brand, LanguageSwitch, PageLoading, WorkspaceLinks } from '../../app/shared'
+import { NotificationBell } from '../../features/notifications/notifications'
 import { useI18n } from '../../i18n'
 import type { Identity } from '../../lib/types'
 
@@ -26,7 +27,7 @@ export default function ParentLayout({ identity }: { identity: Identity }) {
       </div>
     </aside>
     <main className="learner-main">
-      <header className="teacher-topbar"><span>{t('parent.workspace')}</span><strong>{identity.display_name}</strong></header>
+      <header className="teacher-topbar"><span>{t('parent.workspace')}</span><span className="topbar-person"><NotificationBell base="/family" /><strong>{identity.display_name}</strong></span></header>
       <div className="learner-content">
         <Toast />
         <Suspense fallback={<PageLoading />}><Outlet /></Suspense>

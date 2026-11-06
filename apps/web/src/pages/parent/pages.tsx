@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useParams } from 'react-router'
 import { useDates } from '../../calendar/useDates'
 import { ChangePasswordPanel, PreferencesPanel } from '../../features/account/account'
+import { NotificationSettingsPanel } from '../../features/notifications/notifications'
 import { AttendanceSummary } from '../../features/attendance/AttendanceSummary'
 import { LearningPlan } from '../../features/learning/LearningPlan'
 import { PaperBars, TotalBadge, usePaperName } from '../../features/prep/readiness'
@@ -12,7 +13,7 @@ import { money } from '../../lib/money'
 import { ChildData, ChildSummary, classLabel, LearningPlanData, ReportCardData } from '../../lib/types'
 
 export function ParentAccountPage() {
-  return <><PreferencesPanel /><ChangePasswordPanel /></>
+  return <><NotificationSettingsPanel /><PreferencesPanel /><ChangePasswordPanel /></>
 }
 
 const CHILDREN_PATH = '/parent/children'

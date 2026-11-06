@@ -76,15 +76,18 @@ export default function StudentsPage() {
     })
   }
 
+  const emailed = { to: '' }
   const invite = (student: Student) => onSubmit(async (f) => {
-    const result = await api<{ token: string }>(`/students/${student.id}/invitation`, { method: 'POST', body: JSON.stringify({ email: String(f.get('email') || '') }) })
+    const result = await api<{ token: string; email: string; emailed?: boolean }>(`/students/${student.id}/invitation`, { method: 'POST', body: JSON.stringify({ email: String(f.get('email') || '') }) })
+    emailed.to = result.emailed ? result.email : ''
     setInviteLinks((current) => ({ ...current, [student.id]: `${window.location.origin}/#student-invite=${encodeURIComponent(result.token)}` }))
-  }, t('students.inviteCreated'))
+  }, () => emailed.to ? t('notify.linkEmailed', { email: emailed.to }) : t('students.inviteCreated'))
 
   const resetPassword = (student: Student) => run(async () => {
-    const result = await api<{ token: string }>(`/students/${student.id}/password-reset`, { method: 'POST', body: '{}' })
+    const result = await api<{ token: string; email: string; emailed?: boolean }>(`/students/${student.id}/password-reset`, { method: 'POST', body: '{}' })
+    emailed.to = result.emailed ? result.email : ''
     setResetLink({ name: student.legal_name, link: passwordResetLink(result.token) })
-  }, t('students.resetCreated'))
+  }, () => emailed.to ? t('notify.linkEmailed', { email: emailed.to }) : t('students.resetCreated'))
 
   return <section className="work-grid single-column"><div className="panel" id="students">
     <div className="panel-head"><div><h2>{t('admin.title.students')}</h2><p>{t('students.help')}</p></div><span className="count-pill">{t('students.total', { n: total })}</span></div>

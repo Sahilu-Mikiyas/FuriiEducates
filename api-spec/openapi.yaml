@@ -1785,6 +1785,108 @@ paths:
       responses:
         '200': { description: Grade saved; the result is released when nothing remains to grade }
         '404': { description: Written response not found }
+  /me/notifications:
+    get:
+      summary: "The signed-in person's newest notices, written in the language given by ?lang= (en or am), with the unread count"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /me/notifications/unread:
+    get:
+      summary: "How many notices are unread, for the bell"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /me/notifications/read:
+    post:
+      summary: "Mark notices read: {\"ids\": [...]} or {\"all\": true}"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /me/notification-settings:
+    get:
+      summary: "Language of messages, which channels reach the person, muted topics, phone, Telegram link state, and which channels the service has set up"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    put:
+      summary: "Save the language of messages, channel choices, muted topics and SMS phone number"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /me/telegram-link:
+    post:
+      summary: "Make a one-time t.me link that connects the person's Telegram chat when they press Start (409 CHANNEL_NOT_SET_UP without a bot)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+    delete:
+      summary: "Disconnect the person's Telegram chat"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /me/telegram-link/check:
+    post:
+      summary: "Read the bot's new messages and say whether this person's chat is connected"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /notifications/overview:
+    get:
+      summary: "Channel set-up, the school's rules, last 30 days of messages by channel and status, and SMS sent this month (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /notifications/rules:
+    put:
+      summary: "Which automatic topics may go by email, SMS and Telegram: {\"email\": [...], \"sms\": [...], \"telegram\": [...]} (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /notifications/deliveries:
+    get:
+      summary: "The latest 100 outside messages, filtered by ?status= and ?channel=. Texts with sign-in links are not shown (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /notifications/deliveries/{deliveryID}/retry:
+    post:
+      summary: "Send a failed or skipped message again; messages with sign-in links cannot be retried (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /notifications/test:
+    post:
+      summary: "Send one test message now on a channel, to an address or the administrator's own (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /announcements:
+    get:
+      summary: "The latest 50 announcements with message counts (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    post:
+      summary: "Send an announcement to everyone, staff, parents, students or one class and its parents, in the app and on chosen channels. With \"dry_run\": true it only counts who would get it (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
 components:
   securitySchemes:
     sessionCookie:

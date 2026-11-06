@@ -86,5 +86,13 @@ func purgeExpiredRecords(ctx context.Context, db *pgxpool.Pool) (int64, int64, e
 	if err != nil {
 		return sessions.RowsAffected(), 0, err
 	}
+	// Delivery records keep phone numbers and addresses, so they are kept for 90
+	// days; read notices go after 180 days.
+	if _, err := db.Exec(ctx, `DELETE FROM notification_deliveries WHERE created_at < now() - interval '90 days'`); err != nil {
+		return sessions.RowsAffected(), resets.RowsAffected(), err
+	}
+	if _, err := db.Exec(ctx, `DELETE FROM notifications WHERE read_at < now() - interval '180 days'`); err != nil {
+		return sessions.RowsAffected(), resets.RowsAffected(), err
+	}
 	return sessions.RowsAffected(), resets.RowsAffected(), nil
 }

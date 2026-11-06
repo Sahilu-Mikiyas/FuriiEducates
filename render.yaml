@@ -24,3 +24,21 @@ services:
         sync: false
       - key: DEMO_REQUEST_ADMIN_EMAILS
         sync: false
+      - key: PUBLIC_WEB_URL
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SMS_PROVIDER
+        sync: false
+      - key: AFROMESSAGE_TOKEN
+        sync: false
+      - key: AFROMESSAGE_IDENTIFIER_ID
+        sync: false
+      - key: AFROMESSAGE_SENDER_NAME
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_USERNAME
+        sync: false

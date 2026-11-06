@@ -19,6 +19,7 @@ export const adminPages = [
   { id: 'finance', icon: '¤' },
   { id: 'lesson-plans', icon: '▣' },
   { id: 'staff', icon: '♙' },
+  { id: 'messages', icon: '✉' },
   { id: 'demo-requests', icon: '✦' },
   { id: 'settings', icon: '⚙' },
 ] as const

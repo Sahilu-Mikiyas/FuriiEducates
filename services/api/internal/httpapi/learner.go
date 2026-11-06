@@ -105,6 +105,11 @@ func (a *API) createStudentInvitation(w http.ResponseWriter, r *http.Request, id
 		a.serverError(w, r, err)
 		return
 	}
+	emailed, err := a.queueAccountEmail(r.Context(), tx, id.SchoolID, "account.student_invite", email, "#student-invite="+token, expires)
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
 	if _, err = tx.Exec(r.Context(), `INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'student.invited','student_invitation',$3,jsonb_build_object('email',$4::text,'student_id',$5::text))`, id.SchoolID, id.UserID, inviteID, email, studentID); err != nil {
 		a.serverError(w, r, err)
 		return
@@ -113,7 +118,7 @@ func (a *API) createStudentInvitation(w http.ResponseWriter, r *http.Request, id
 		a.serverError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"data": map[string]string{"id": inviteID, "email": email, "token": token, "expires_at": expires.Format(time.RFC3339)}})
+	writeJSON(w, http.StatusCreated, map[string]any{"data": map[string]any{"id": inviteID, "email": email, "token": token, "expires_at": expires.Format(time.RFC3339), "emailed": emailed}})
 }
 
 func (a *API) acceptStudentInvitation(w http.ResponseWriter, r *http.Request) {

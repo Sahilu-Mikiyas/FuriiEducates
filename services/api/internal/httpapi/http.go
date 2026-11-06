@@ -32,6 +32,7 @@ type API struct {
 	trustProxy     bool
 	limits         rateLimits
 	limiter        *rateLimiter
+	notify         *notifier
 }
 
 // New builds the HTTP handler. Environment settings:
@@ -60,7 +61,7 @@ func newAPI(a *auth.Service, db *pgxpool.Pool, secure bool, ttl time.Duration, l
 		log.Warn("ignoring invalid COOKIE_SAMESITE", "error", err)
 	}
 	trustProxy, _ := strconv.ParseBool(os.Getenv("TRUST_PROXY_HEADERS"))
-	return &API{auth: a, db: db, secure: secure, sameSite: sameSite, ttl: ttl, log: log, allowedOrigins: allowedOrigins, trustProxy: trustProxy, limits: limits, limiter: newRateLimiter()}
+	return &API{auth: a, db: db, secure: secure, sameSite: sameSite, ttl: ttl, log: log, allowedOrigins: allowedOrigins, trustProxy: trustProxy, limits: limits, limiter: newRateLimiter(), notify: newNotifier(allowedOrigins)}
 }
 
 func (a *API) routes() http.Handler {
@@ -79,6 +80,7 @@ func (a *API) routes() http.Handler {
 	a.registerLearningRoutes(mux)
 	a.registerQuizRoutes(mux)
 	a.registerRecordRoutes(mux)
+	a.registerNotificationRoutes(mux)
 	return a.observe(a.cors(mux))
 }
 
@@ -309,6 +311,11 @@ func (a *API) isPlatformOperator(ctx context.Context, identity auth.Identity) (b
 }
 
 func (a *API) serverError(w http.ResponseWriter, r *http.Request, err error) {
+	// A browser that left the page cancels its requests; that is not a fault.
+	if errors.Is(err, context.Canceled) && r.Context().Err() != nil {
+		writeError(w, 499, "REQUEST_CANCELLED", "The request was cancelled.", nil)
+		return
+	}
 	a.log.Error("request failed", "route", r.Pattern, "request_id", w.Header().Get("X-Request-ID"), "error", err)
 	writeError(w, 500, "INTERNAL_ERROR", "The request could not be completed.", nil)
 }

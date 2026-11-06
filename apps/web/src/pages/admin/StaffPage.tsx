@@ -20,11 +20,13 @@ export default function StaffPage() {
   const [resetLink, setResetLink] = useState<{ name: string; link: string } | null>(null)
   const copyFailed = () => setError(t('common.copyFailed'))
 
+  const emailed = { to: '' }
   const invite = onSubmit(async (f) => {
-    const result = await api<{ id: string; token: string }>('/staff/invitations', { method: 'POST', body: JSON.stringify({ email: f.get('email') }) })
+    const result = await api<{ id: string; token: string; email: string; emailed?: boolean }>('/staff/invitations', { method: 'POST', body: JSON.stringify({ email: f.get('email') }) })
+    emailed.to = result.emailed ? result.email : ''
     setInviteLink(`${window.location.origin}/#invite=${encodeURIComponent(result.token)}`)
     await refresh('/staff/invitations')
-  }, t('staff.inviteCreated'))
+  }, () => emailed.to ? t('notify.linkEmailed', { email: emailed.to }) : t('staff.inviteCreated'))
 
   const assign = (teacher: StaffMember) => onSubmit(async (f) => {
     const classID = String(f.get('class_id') || '')
@@ -42,9 +44,10 @@ export default function StaffPage() {
   }
 
   const reset = (teacher: StaffMember) => run(async () => {
-    const result = await api<{ token: string }>(`/staff/${teacher.id}/password-reset`, { method: 'POST', body: '{}' })
+    const result = await api<{ token: string; email: string; emailed?: boolean }>(`/staff/${teacher.id}/password-reset`, { method: 'POST', body: '{}' })
+    emailed.to = result.emailed ? result.email : ''
     setResetLink({ name: teacher.display_name, link: passwordResetLink(result.token) })
-  }, t('staff.resetCreated'))
+  }, () => emailed.to ? t('notify.linkEmailed', { email: emailed.to }) : t('staff.resetCreated'))
 
   const toggle = (teacher: StaffMember) => run(async () => {
     await api(`/staff/${teacher.id}`, { method: 'PATCH', body: JSON.stringify({ status: teacher.status === 'active' ? 'disabled' : 'active' }) })
