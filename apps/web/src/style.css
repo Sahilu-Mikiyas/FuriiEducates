@@ -518,6 +518,14 @@ footer span{color:#1d4ed8}
 .loading>div{max-width:420px;padding:0 20px;text-align:center}
 .loading p{margin:0}
 .loading-wait{margin-top:10px!important;font-size:13px;line-height:1.5}
+/* Editing records */
+.record-actions{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;margin-left:auto}
+.mini-list>div{flex-wrap:wrap}
+.record-edit{margin:8px 0;padding:10px;border:1px solid #ececec;border-radius:8px}
+.record-edit.inline-form{display:flex;flex-wrap:wrap;gap:8px}
+.record-edit.inline-form input{flex:1 1 140px;min-width:0}
+.chip-remove{margin-left:4px;padding:0 4px;border:0;background:none;color:#991b1b;font:inherit;font-weight:700;cursor:pointer}
+.passport-list article .record-actions{flex:1 1 100%;margin:6px 0 0}
 /* Parent portal */
 .guardian-access{flex:1 1 100%;min-width:0}
 .guardian-access .inline-form{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;margin:0}

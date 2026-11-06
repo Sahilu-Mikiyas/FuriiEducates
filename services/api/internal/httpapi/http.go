@@ -78,7 +78,8 @@ func (a *API) routes() http.Handler {
 	a.registerParentRoutes(mux)
 	a.registerLearningRoutes(mux)
 	a.registerQuizRoutes(mux)
-	return a.cors(mux)
+	a.registerRecordRoutes(mux)
+	return a.observe(a.cors(mux))
 }
 
 // parseSameSite turns COOKIE_SAMESITE into a cookie mode. SameSite=None is
@@ -308,7 +309,7 @@ func (a *API) isPlatformOperator(ctx context.Context, identity auth.Identity) (b
 }
 
 func (a *API) serverError(w http.ResponseWriter, r *http.Request, err error) {
-	a.log.Error("request failed", "path", r.URL.Path, "error", err)
+	a.log.Error("request failed", "route", r.Pattern, "request_id", w.Header().Get("X-Request-ID"), "error", err)
 	writeError(w, 500, "INTERNAL_ERROR", "The request could not be completed.", nil)
 }
 

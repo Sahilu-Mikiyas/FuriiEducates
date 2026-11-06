@@ -74,12 +74,12 @@ func (a *API) createStudentInvitation(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 	var accountExists bool
-	if err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM users WHERE school_id=$1 AND lower(email)=lower($2))`, id.SchoolID, email).Scan(&accountExists); err != nil {
+	if accountExists, err = emailInUse(r.Context(), tx, email); err != nil {
 		a.serverError(w, r, err)
 		return
 	}
 	if accountExists {
-		writeError(w, 409, "ACCOUNT_EXISTS", "An account already uses this email in the school.", nil)
+		writeEmailInUse(w)
 		return
 	}
 	raw := make([]byte, 32)

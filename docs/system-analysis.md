@@ -152,7 +152,23 @@ Limits: questions are plain text, with no pictures or maths formatting, which wi
 
 **2026-11-03 — Waking-up message.** The API sleeps after about 15 idle minutes on Render's free plan, and the first visitor then waits up to a minute on the opening screen, which looked frozen. After 4 seconds that screen now explains the wait. This does not shorten it: an uptime ping would, and a paid plan is needed before any pilot.
 
-Next: SMS and phone sign-in, which wait on choosing a provider, and pictures in questions.
+**2026-11-06 — Pilot readiness, part 1: fixes and editing.**
+
+- Administrators can now rename or change the dates of an academic year, and remove one with no classes or terms. A year cannot shrink past its terms. Classes can be renamed, and a class created by mistake removed; one with students, subjects, attendance, reports or work recorded stays, because some of that would otherwise go with it.
+- A teacher can be taken off a class (P1-5). Subjects they taught there go back to any teacher of the class, so marks can still be entered.
+- Finance entries can be voided with a reason (P1-5). They stay in the ledger, marked void, and leave every total. Totals are now shown per currency, so birr and dollars are never added together (P1-8).
+- Class files can be removed by the teacher who shared them or an administrator (P1-5). Admins can list a class's files (P1-13).
+- Past results and external exams can be verified, rejected or removed (P1-5). Correcting one means removing it and adding it again.
+- Published questions can be archived (P1-5). They leave practice and new tests; tests that already include them keep them.
+- An inactive student cannot sign in and is signed out everywhere, and comes back on reactivating (P1-6).
+- A CSV of past results saved from Excel, with its byte order mark, is now read correctly (P1-7).
+- Invitations for staff, students and parents check emails across every school, since an email can belong to one account only, and say so when it is taken (P1-10).
+- Every API request gets an ID and a log line naming the route, status and time, never IDs or query values. API responses are not cached and cannot be framed. The website sends a Content-Security-Policy and other security headers through Vercel.
+- New API tests cover all of this. The whole flow ran in Edge against a production build with the security policy applied, and a check confirmed the test does catch anything the policy blocks.
+
+Still open from the audit: archiving whole exams and editing past results in place; email delivery; files stored in the database; error tracking; a backup restore rehearsal; one email per account across schools, which is a product decision.
+
+Next: notifications, then year-end rollover and promotion, then named roles.
 
 ---
 

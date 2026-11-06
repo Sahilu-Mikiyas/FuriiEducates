@@ -5,14 +5,14 @@ import { useDates } from '../../calendar/useDates'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { useRefresh, useStaff, useStudents } from '../../lib/queries'
-import type { FinanceEntry, FinanceSummary } from '../../lib/types'
+import type { FinanceEntry, FinanceSummary, FinanceTotals } from '../../lib/types'
 import { money } from '../../lib/money'
 
 
 export function FinanceWorkspace() {
   const { t, label } = useI18n()
   const { date } = useDates()
-  const { busy, onSubmit } = useAction()
+  const { busy, run, onSubmit } = useAction()
   const refresh = useRefresh()
   const students = useStudents().data ?? []
   const staff = useStaff().data ?? []
@@ -30,22 +30,32 @@ export function FinanceWorkspace() {
     await refresh('/finance/summary', '/finance/entries')
   }, t('finance.saved'))
 
-  const totals: [string, number | undefined][] = [
-    [t('finance.tuitionBilled'), summary?.tuition_billed_minor],
-    [t('finance.paymentsRecorded'), summary?.payments_recorded_minor],
-    [t('finance.outstanding'), summary?.outstanding_charges_minor],
-    [t('finance.expenses'), summary?.expenses_recorded_minor],
-    [t('finance.salaries'), summary?.salaries_recorded_minor],
+  const voidEntry = (entry: FinanceEntry) => {
+    const reason = window.prompt(t('finance.voidReason'))
+    if (!reason?.trim()) return
+    void run(async () => {
+      await api(`/finance/entries/${entry.id}/void`, { method: 'POST', body: JSON.stringify({ reason }) })
+      await refresh('/finance/summary', '/finance/entries')
+    }, t('finance.voided'))
+  }
+  // Each currency is totalled on its own, since birr and dollars cannot be added.
+  const currencies = summary?.by_currency.length ? summary.by_currency : [{ currency_code: 'ETB', tuition_billed_minor: 0, payments_recorded_minor: 0, outstanding_charges_minor: 0, expenses_recorded_minor: 0, salaries_recorded_minor: 0 }]
+  const totals = (c: FinanceTotals): [string, number][] => [
+    [t('finance.tuitionBilled'), c.tuition_billed_minor],
+    [t('finance.paymentsRecorded'), c.payments_recorded_minor],
+    [t('finance.outstanding'), c.outstanding_charges_minor],
+    [t('finance.expenses'), c.expenses_recorded_minor],
+    [t('finance.salaries'), c.salaries_recorded_minor],
   ]
 
   return <div className="operations-page">
-    <section className="metrics">
-      {totals.map(([name, amount]) => <article className="metric" key={name}>
-        <div className="metric-top"><span>{name}</span><i>ETB</i></div>
-        <strong>{typeof amount === 'number' ? money(amount) : '—'}</strong>
+    {currencies.map((c) => <section className="metrics" key={c.currency_code}>
+      {totals(c).map(([name, amount]) => <article className="metric" key={name}>
+        <div className="metric-top"><span>{name}</span><i>{c.currency_code}</i></div>
+        <strong>{summary ? money(amount, c.currency_code) : '—'}</strong>
         <small>{t('finance.ledgerTotals')}</small>
       </article>)}
-    </section>
+    </section>)}
     <section className="panel">
       <div className="panel-head"><div><h2>{t('finance.recordTitle')}</h2><p>{t('finance.recordHelp')}</p></div></div>
       <form className="stack-form" onSubmit={save}>
@@ -73,7 +83,7 @@ export function FinanceWorkspace() {
     <section className="panel">
       <div className="panel-head"><div><h2>{t('finance.ledger')}</h2><p>{t('finance.ledgerHelp')}</p></div><span className="count-pill">{t('finance.records', { n: entries.length })}</span></div>
       <div className="table-wrap"><table>
-        <thead><tr><th>{t('finance.col.date')}</th><th>{t('finance.col.type')}</th><th>{t('finance.col.detail')}</th><th>{t('finance.col.person')}</th><th>{t('finance.col.amount')}</th><th>{t('finance.col.status')}</th></tr></thead>
+        <thead><tr><th>{t('finance.col.date')}</th><th>{t('finance.col.type')}</th><th>{t('finance.col.detail')}</th><th>{t('finance.col.person')}</th><th>{t('finance.col.amount')}</th><th>{t('finance.col.status')}</th><th /></tr></thead>
         <tbody>
           {entries.map((e) => <tr key={e.id}>
             <td>{date(e.created_at)}</td>
@@ -82,8 +92,9 @@ export function FinanceWorkspace() {
             <td>{e.student_name || e.staff_name || '—'}</td>
             <td>{money(e.amount_minor, e.currency_code)}</td>
             <td>{label('finance.status', e.status)}</td>
+            <td>{e.status !== 'void' && <button className="secondary compact" disabled={busy} onClick={() => voidEntry(e)}>{t('finance.void')}</button>}</td>
           </tr>)}
-          {!entries.length && <tr><td colSpan={6} className="empty">{t('finance.empty')}</td></tr>}
+          {!entries.length && <tr><td colSpan={7} className="empty">{t('finance.empty')}</td></tr>}
         </tbody>
       </table></div>
     </section>

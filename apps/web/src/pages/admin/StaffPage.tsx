@@ -33,6 +33,14 @@ export default function StaffPage() {
     await refresh('/staff')
   }, t('staff.assigned'))
 
+  const unassign = (teacher: StaffMember, classID: string, name: string) => {
+    if (!window.confirm(t('staff.unassignConfirm', { name: teacher.display_name, className: name }))) return
+    void run(async () => {
+      await api(`/classes/${classID}/teachers/${teacher.id}`, { method: 'DELETE' })
+      await refresh('/staff', '/class-subjects')
+    }, t('staff.unassigned'))
+  }
+
   const reset = (teacher: StaffMember) => run(async () => {
     const result = await api<{ token: string }>(`/staff/${teacher.id}/password-reset`, { method: 'POST', body: '{}' })
     setResetLink({ name: teacher.display_name, link: passwordResetLink(result.token) })
@@ -78,7 +86,7 @@ export default function StaffPage() {
               <div className="assigned-classes">
                 {member.class_ids.map((id) => {
                   const classroom = classes.find((c) => c.id === id)
-                  return classroom ? <span key={id}>{classLabel(classroom)}</span> : null
+                  return classroom ? <span key={id}>{classLabel(classroom)} <button type="button" className="chip-remove" disabled={busy} aria-label={t('staff.unassignFrom', { name: member.display_name, className: classLabel(classroom) })} onClick={() => unassign(member, id, classLabel(classroom))}>×</button></span> : null
                 })}
                 {!member.class_ids.length && <small>{t('staff.noClasses')}</small>}
               </div>

@@ -43,7 +43,7 @@ func (a *API) previewAcademicImport(w http.ResponseWriter, r *http.Request, id a
 		return
 	}
 	for i := range header {
-		header[i] = strings.ToLower(strings.TrimSpace(header[i]))
+		header[i] = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(header[i], "\xef\xbb\xbf")))
 	}
 	if len(header) != len(academicCSVHeaders) {
 		writeError(w, 400, "VALIDATION_ERROR", "CSV headers must be student_number, school_name, academic_year_label, grade_level, subject_name, score, maximum_score, grade_label, source_type in that order.", nil)

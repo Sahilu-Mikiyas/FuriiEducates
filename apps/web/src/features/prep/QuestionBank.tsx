@@ -78,6 +78,13 @@ export function QuestionBank() {
     await refreshAll()
     setNotice(t('bank.approved', { n: result.approved }))
   })
+  const archive = (id: string) => {
+    if (!window.confirm(t('questions.archiveConfirm'))) return Promise.resolve()
+    return run(async () => {
+      await api(`/questions/${id}/archive`, { method: 'POST', body: '{}' })
+      await refreshAll()
+    }, t('questions.archived'))
+  }
   const reject = (id: string) => run(async () => {
     await api(`/prep/questions/${id}/reject`, { method: 'POST', body: '{}' })
     await refreshAll()
@@ -153,6 +160,7 @@ export function QuestionBank() {
           {q.options.map((option) => <span className={`question-option ${q.correct === option.id ? 'correct-option' : ''}`} key={option.id}>{option.id}. {option.text}{q.correct === option.id ? ' ✓' : ''}</span>)}
           {q.explanation && <small>{q.explanation}</small>}
           <small>{t('questions.sourceLine', { source: q.source_name })} · {q.license_notes}{q.author ? ` · ${q.author}` : ''}</small>
+          {isAdmin && q.status === 'published' && <div className="operation-actions"><button className="secondary compact" disabled={busy} onClick={() => void archive(q.id)}>{t('questions.archive')}</button></div>}
           {isAdmin && q.status === 'draft' && <div className="operation-actions">
             <button className="secondary compact" disabled={busy} onClick={() => void reject(q.id)}>{t('bank.reject')}</button>
             <button className="primary compact" disabled={busy} onClick={() => void approve([q.id])}>{t('bank.approve')}</button>

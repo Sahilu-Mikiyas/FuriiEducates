@@ -26,6 +26,23 @@ export default function AcademicHistoryPage() {
   const exams = useExternalExams(studentID).data ?? []
   const recordsPath = `/students/${studentID}/academic-records`
   const examsPath = `/students/${studentID}/external-exams`
+  const review = (kind: 'academic-records' | 'external-exams', recordID: string, status: string) => run(async () => {
+    await api(`/${kind}/${recordID}/verification`, { method: 'POST', body: JSON.stringify({ status }) })
+    await refresh(recordsPath, examsPath)
+  }, t('history.reviewed'))
+  const removeRecord = (kind: 'academic-records' | 'external-exams', recordID: string) => {
+    if (!window.confirm(t('history.removeConfirm'))) return
+    void run(async () => {
+      await api(`/${kind}/${recordID}`, { method: 'DELETE' })
+      await refresh(recordsPath, examsPath)
+    }, t('history.removed'))
+  }
+  const actions = (kind: 'academic-records' | 'external-exams', recordID: string, status: string) => <span className="record-actions">
+    <span className={`status-pill ${status === 'verified' ? '' : 'draft'}`}>{label('verification', status)}</span>
+    {status !== 'verified' && <button type="button" className="secondary compact" disabled={busy} onClick={() => void review(kind, recordID, 'verified')}>{t('history.verify')}</button>}
+    {status !== 'rejected' && <button type="button" className="secondary compact" disabled={busy} onClick={() => void review(kind, recordID, 'rejected')}>{t('history.reject')}</button>}
+    <button type="button" className="secondary compact" disabled={busy} onClick={() => removeRecord(kind, recordID)}>{t('guardian.remove')}</button>
+  </span>
 
   useEffect(() => { setStudentID((current) => current || students[0]?.id || '') }, [students])
 
@@ -87,7 +104,8 @@ export default function AcademicHistoryPage() {
             {records.map((r) => <article key={r.id}>
               <div><strong>{r.subject_name}</strong><span>{r.school_name} · {r.grade_level} · {r.academic_year_label}</span></div>
               <b>{scoreText(r.score, r.maximum_score)}</b>
-              <small>{r.grade_label || label('status', r.verification_status)}</small>
+              <small>{r.grade_label}</small>
+              {actions('academic-records', r.id, r.verification_status)}
             </article>)}
             {!records.length && <p className="empty">{t('history.recordsEmpty')}</p>}
           </div>
@@ -114,6 +132,7 @@ export default function AcademicHistoryPage() {
                 {x.breakdowns.map((b) => <small key={b.section_name}>{b.section_name}: {b.score ?? '—'}{b.maximum_score === null ? '' : ` / ${b.maximum_score}`}</small>)}
               </div>
               <b>{x.score === null ? (x.score_label || '—') : scoreText(x.score, x.maximum_score)}</b>
+              {actions('external-exams', x.id, x.verification_status)}
             </article>)}
             {!exams.length && <p className="empty">{t('history.examsEmpty')}</p>}
           </div>

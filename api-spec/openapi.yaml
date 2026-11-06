@@ -571,6 +571,88 @@ paths:
       responses:
         '200': { description: Success }
         '401': { description: Authentication required }
+  /academic-years/{yearID}:
+    patch:
+      summary: "Change a year's name and dates. Its terms must stay inside (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    delete:
+      summary: "Remove a year with no classes or terms (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /classes/{classID}:
+    patch:
+      summary: "Rename a class or change its grade (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    delete:
+      summary: "Remove a class with nothing recorded in it (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /classes/{classID}/teachers/{teacherID}:
+    delete:
+      summary: "Take a teacher off a class. Their subjects there go back to any teacher of the class (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /finance/entries/{entryID}/void:
+    post:
+      summary: "Void an entry with a reason. It stays in the ledger and leaves the totals (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /resources/{resourceID}:
+    delete:
+      summary: "Remove a class file (the teacher who shared it, or an administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /academic-records/{recordID}/verification:
+    post:
+      summary: "Mark a past result verified, unverified or rejected (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /academic-records/{recordID}:
+    delete:
+      summary: "Remove a past result (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /external-exams/{examID}/verification:
+    post:
+      summary: "Mark an external exam result verified, unverified or rejected (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /external-exams/{examID}:
+    delete:
+      summary: "Remove an external exam result (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /questions/{questionID}/archive:
+    post:
+      summary: "Archive a published question. Tests that include it keep it (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
   /demo-requests:
     post:
       summary: Submit a public school setup request

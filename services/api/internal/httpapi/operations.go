@@ -148,7 +148,37 @@ func (a *API) financeSummary(w http.ResponseWriter, r *http.Request, id auth.Ide
 		a.serverError(w, r, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"data": s})
+	rows, err := a.db.Query(r.Context(), `SELECT currency_code,
+		COALESCE(sum(amount_minor) FILTER(WHERE entry_type='tuition_charge'),0)::bigint,COALESCE(sum(amount_minor) FILTER(WHERE entry_type='payment'),0)::bigint,
+		COALESCE(sum(amount_minor) FILTER(WHERE entry_type='expense'),0)::bigint,COALESCE(sum(amount_minor) FILTER(WHERE entry_type='salary'),0)::bigint
+		FROM finance_entries WHERE school_id=$1 AND status<>'void' GROUP BY currency_code ORDER BY currency_code<>'ETB',currency_code`, id.SchoolID)
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	type currencyTotals struct {
+		Currency    string `json:"currency_code"`
+		Billed      int64  `json:"tuition_billed_minor"`
+		Payments    int64  `json:"payments_recorded_minor"`
+		Expenses    int64  `json:"expenses_recorded_minor"`
+		Salaries    int64  `json:"salaries_recorded_minor"`
+		Outstanding int64  `json:"outstanding_charges_minor"`
+	}
+	byCurrency, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (currencyTotals, error) {
+		var x currencyTotals
+		err := row.Scan(&x.Currency, &x.Billed, &x.Payments, &x.Expenses, &x.Salaries)
+		x.Outstanding = max(0, x.Billed-x.Payments)
+		return x, err
+	})
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	if byCurrency == nil {
+		byCurrency = []currencyTotals{}
+	}
+	writeJSON(w, 200, map[string]any{"data": map[string]any{"tuition_billed_minor": s.TuitionBilled, "payments_recorded_minor": s.PaymentsRecorded, "expenses_recorded_minor": s.ExpensesRecorded,
+		"salaries_recorded_minor": s.SalariesRecorded, "outstanding_charges_minor": s.OutstandingCharges, "by_currency": byCurrency}})
 }
 
 func (a *API) listLessonPlans(w http.ResponseWriter, r *http.Request, id auth.Identity) {
@@ -351,6 +381,7 @@ type resourceMeta struct {
 	MediaType   string    `json:"media_type"`
 	FileSize    int64     `json:"file_size"`
 	CreatedAt   time.Time `json:"created_at"`
+	CanDelete   bool      `json:"can_delete"`
 }
 
 func (a *API) uploadClassResource(w http.ResponseWriter, r *http.Request, id auth.Identity) {
@@ -427,8 +458,8 @@ func (a *API) listStudentResources(w http.ResponseWriter, r *http.Request, id au
 	a.writeResources(w, r, id, `r.class_id IN(SELECT e.class_id FROM enrollments e JOIN students s ON s.id=e.student_id AND s.school_id=e.school_id WHERE s.user_id=$2 AND s.school_id=$1 AND e.status='active')`, id.UserID)
 }
 func (a *API) writeResources(w http.ResponseWriter, r *http.Request, id auth.Identity, where string, arg any) {
-	query := `SELECT r.id::text,r.class_id::text,r.title,r.description,r.subject,r.file_name,r.media_type,r.file_size,r.created_at FROM teaching_resources r WHERE r.school_id=$1 AND ` + where + ` ORDER BY r.created_at DESC LIMIT 500`
-	rows, err := a.db.Query(r.Context(), query, id.SchoolID, arg)
+	query := `SELECT r.id::text,r.class_id::text,r.title,r.description,r.subject,r.file_name,r.media_type,r.file_size,r.created_at,(r.uploaded_by=$3::uuid OR $4) FROM teaching_resources r WHERE r.school_id=$1 AND ` + where + ` ORDER BY r.created_at DESC LIMIT 500`
+	rows, err := a.db.Query(r.Context(), query, id.SchoolID, arg, id.UserID, hasRole(id.Roles, "school_admin"))
 	if err != nil {
 		a.serverError(w, r, err)
 		return
@@ -437,11 +468,15 @@ func (a *API) writeResources(w http.ResponseWriter, r *http.Request, id auth.Ide
 	items := []resourceMeta{}
 	for rows.Next() {
 		var x resourceMeta
-		if err = rows.Scan(&x.ID, &x.ClassID, &x.Title, &x.Description, &x.Subject, &x.FileName, &x.MediaType, &x.FileSize, &x.CreatedAt); err != nil {
+		if err = rows.Scan(&x.ID, &x.ClassID, &x.Title, &x.Description, &x.Subject, &x.FileName, &x.MediaType, &x.FileSize, &x.CreatedAt, &x.CanDelete); err != nil {
 			a.serverError(w, r, err)
 			return
 		}
 		items = append(items, x)
+	}
+	if err = rows.Err(); err != nil {
+		a.serverError(w, r, err)
+		return
 	}
 	writeJSON(w, 200, map[string]any{"data": items})
 }

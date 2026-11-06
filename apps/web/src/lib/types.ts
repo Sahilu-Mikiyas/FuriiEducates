@@ -95,9 +95,10 @@ export type TeacherReview = { attempt_id: string; question_id: string; assignmen
 export type TeacherLearningRow = { student_id: string; student_number: string; student_name: string; skill_id: string; skill_title: string; estimated_mastery: number; confidence: number; evidence_count: number; confidence_band: string; active_recommendations: number }
 
 export type FinanceEntry = { id: string; entry_type: string; category: string; description: string; amount_minor: number; currency_code: string; student_name: string; staff_name: string; due_on?: string; paid_on?: string; status: string; reference: string; created_at: string }
-export type FinanceSummary = { tuition_billed_minor: number; payments_recorded_minor: number; expenses_recorded_minor: number; salaries_recorded_minor: number; outstanding_charges_minor: number }
+export type FinanceTotals = { tuition_billed_minor: number; payments_recorded_minor: number; expenses_recorded_minor: number; salaries_recorded_minor: number; outstanding_charges_minor: number }
+export type FinanceSummary = FinanceTotals & { by_currency: (FinanceTotals & { currency_code: string })[] }
 export type LessonPlan = { id: string; teacher_name?: string; class_name?: string; grade_level?: string; class_id: string; subject: string; lesson_date: string; duration_minutes: number; topic: string; objectives: string; prior_knowledge: string; materials: string; lesson_phases: { phase: string; minutes: number; activities: string }[]; differentiation: string; assessment: string; homework: string; reflection: string; status: string }
-export type Resource = { id: string; class_id: string; title: string; description: string; subject: string; file_name: string; media_type: string; file_size: number; created_at: string }
+export type Resource = { id: string; class_id: string; title: string; description: string; subject: string; file_name: string; media_type: string; file_size: number; created_at: string; can_delete?: boolean }
 
 export type SessionSummary = { assignment_id: string; title: string; class_name: string; grade_level: string; duration_minutes: number; locked_mode: boolean; requires_start_code: boolean; session_open: boolean; opens_at: string | null; due_at: string | null; enrolled: number; in_progress: number; submitted: number }
 export type RosterRow = { student_id: string; student_number: string; student_name: string; attempt_id: string; status: string; deadline_at: string | null; submitted_at: string | null; answered: number; last_saved_at: string | null; integrity_flags: number; incidents: number }

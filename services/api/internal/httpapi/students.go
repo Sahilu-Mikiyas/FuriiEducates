@@ -172,6 +172,10 @@ func (a *API) updateStudentProfile(w http.ResponseWriter, r *http.Request, id au
 		writeError(w, 404, "NOT_FOUND", "Student not found.", nil)
 		return
 	}
+	if err = syncStudentLogin(r.Context(), tx, id.SchoolID, studentID, req.Status); err != nil {
+		a.serverError(w, r, err)
+		return
+	}
 	// The log records that the profile changed, not its medical details.
 	if _, err = tx.Exec(r.Context(), `INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'student.profile_updated','student',$3,jsonb_build_object('status',$4::text))`, id.SchoolID, id.UserID, studentID, req.Status); err != nil {
 		a.serverError(w, r, err)

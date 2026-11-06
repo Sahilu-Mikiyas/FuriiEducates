@@ -120,12 +120,13 @@ func (a *API) createStaffInvitation(w http.ResponseWriter, r *http.Request, id a
 		return
 	}
 	var existing bool
-	if err := a.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM users u WHERE u.school_id=$1 AND lower(u.email)=lower($2))`, id.SchoolID, email).Scan(&existing); err != nil {
+	existing, err = emailInUse(r.Context(), a.db, email)
+	if err != nil {
 		a.serverError(w, r, err)
 		return
 	}
 	if existing {
-		writeError(w, http.StatusConflict, "ACCOUNT_EXISTS", "An account already uses that email.", map[string]string{"email": "Already in use."})
+		writeEmailInUse(w)
 		return
 	}
 	rawToken := make([]byte, 32)

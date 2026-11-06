@@ -52,6 +52,13 @@ export default function CurriculumPage() {
     await refresh('/questions')
   }, t('questions.published'))
 
+  const archiveQuestion = (questionID: string) => {
+    if (!window.confirm(t('questions.archiveConfirm'))) return Promise.resolve()
+    return run(async () => {
+      await api(`/questions/${questionID}/archive`, { method: 'POST', body: '{}' })
+      await refresh('/questions', '/prep/bank', '/prep/questions')
+    }, t('questions.archived'))
+  }
   return <section className="panel curriculum-panel" id="curriculum">
     <div className="panel-head"><div><p className="eyebrow">{t('curriculum.eyebrow')}</p><h2>{t('curriculum.heading')}</h2><p>{t('curriculum.help')}</p></div><span className="year-icon">⌘</span></div>
     <div className="curriculum-grid">
@@ -149,6 +156,7 @@ export default function CurriculumPage() {
             <small>{q.skill_tags.map((tag) => `${tag.title} (${Number(tag.weight).toFixed(2)})`).join(' · ') || t('questions.noTag')}</small>
             {q.source_name && <small>{t('questions.sourceLine', { source: q.source_name })}{q.license_notes ? ` · ${q.license_notes}` : ''}</small>}
             {q.status === 'draft' && <button className="secondary compact" disabled={busy || !q.skill_tags.length} onClick={() => void publishQuestion(q.id)}>{t('questions.publish')}</button>}
+            {q.status === 'published' && <button className="secondary compact" disabled={busy} onClick={() => void archiveQuestion(q.id)}>{t('questions.archive')}</button>}
           </article>)}
           {!questions.length && <p className="empty">{t('questions.empty')}</p>}
         </div>

@@ -429,6 +429,10 @@ func (a *API) updateStudent(w http.ResponseWriter, r *http.Request, id auth.Iden
 		a.databaseError(w, r, err)
 		return
 	}
+	if err = syncStudentLogin(r.Context(), tx, id.SchoolID, studentID, req.Status); err != nil {
+		a.serverError(w, r, err)
+		return
+	}
 	if _, err = tx.Exec(r.Context(), `INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'student.updated','student',$3,jsonb_build_object('legal_name',$4::text,'preferred_language',$5::text,'status',$6::text))`, id.SchoolID, id.UserID, studentID, req.LegalName, strings.TrimSpace(req.PreferredLanguage), req.Status); err != nil {
 		a.serverError(w, r, err)
 		return

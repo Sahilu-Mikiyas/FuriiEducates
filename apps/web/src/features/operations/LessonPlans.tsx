@@ -144,7 +144,7 @@ export function TeacherPlanning({ classID }: { classID: string }) {
         </div>
         <button className="primary compact" disabled={busy}>{busy ? t('resources.uploading') : t('resources.upload')} →</button>
       </form>
-      <ResourceList resources={resources} />
+      <ResourceList resources={resources} onRemoved={() => refresh(`/teacher/classes/${classID}/resources`)} />
     </section>
   </div>
 }

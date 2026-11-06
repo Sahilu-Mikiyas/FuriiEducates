@@ -74,6 +74,15 @@ func (a *API) inviteGuardian(w http.ResponseWriter, r *http.Request, id auth.Ide
 		a.linkExistingGuardian(w, r, id, tx, studentID, guardianID, userID, status, isStudent)
 		return
 	}
+	elsewhere, err := emailInUse(r.Context(), tx, email)
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	if elsewhere {
+		writeEmailInUse(w)
+		return
+	}
 	raw := make([]byte, 32)
 	if _, err = rand.Read(raw); err != nil {
 		a.serverError(w, r, err)
