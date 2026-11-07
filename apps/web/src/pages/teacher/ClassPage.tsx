@@ -1,17 +1,20 @@
 import { Link } from 'react-router'
+import { useAction } from '../../app/feedback'
 import { useI18n } from '../../i18n'
+import { api } from '../../lib/api'
 import { useTeacherLearning, useTeacherRoster } from '../../lib/queries'
 import { useTeacherContext } from './TeacherLayout'
 
 export default function ClassPage() {
   const { t, label } = useI18n()
-  const { classID } = useTeacherContext()
+  const { classID, classroom } = useTeacherContext()
   const rosterQuery = useTeacherRoster(classID)
   const learningQuery = useTeacherLearning(classID)
   const students = rosterQuery.data ?? []
   const rows = learningQuery.data ?? []
   if (!classID) return null
   return <>
+    {classroom?.homeroom && <HomeroomMessage classID={classID} />}
     <section className="panel teacher-roster">
       <div className="panel-head">
         <div><h2>{t('admin.title.students')}</h2><p>{rosterQuery.isPending ? t('common.loading') : t('teacher.activeStudents', { n: students.length })}</p></div>
@@ -42,4 +45,26 @@ export default function ClassPage() {
       </table></div>
     </section>
   </>
+}
+
+// HomeroomMessage lets the homeroom teacher message the class's students and
+// families in the app, and by email or Telegram. SMS stays with the office.
+function HomeroomMessage({ classID }: { classID: string }) {
+  const { t, label } = useI18n()
+  const { busy, onSubmit } = useAction()
+  const send = onSubmit(async (f) => {
+    await api(`/teacher/classes/${classID}/announcements`, { method: 'POST', body: JSON.stringify({ title: f.get('title'), body: f.get('body'), channels: f.getAll('channels') }) })
+  }, t('homeroom.sent'))
+  return <section className="panel homeroom-message">
+    <div className="panel-head"><div><p className="eyebrow">{t('homeroom.eyebrow')}</p><h2>{t('homeroom.title')}</h2><p>{t('homeroom.help')}</p></div></div>
+    <form className="stack-form announce-form" onSubmit={send}>
+      <label>{t('messages.title')}<input name="title" maxLength={120} required /></label>
+      <label>{t('messages.body')}<textarea name="body" maxLength={2000} rows={3} required /></label>
+      <fieldset className="notice-topics">
+        <legend>{t('messages.alsoSendBy')}</legend>
+        {['email', 'telegram'].map((channel) => <label key={channel} className="bank-check"><input type="checkbox" name="channels" value={channel} /> {label('notifyChannel', channel)}</label>)}
+      </fieldset>
+      <button className="primary" disabled={busy}>{t('homeroom.send')}<span>→</span></button>
+    </form>
+  </section>
 }

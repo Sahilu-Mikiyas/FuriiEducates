@@ -24,7 +24,7 @@ import (
 const studentInviteTTL = 7 * 24 * time.Hour
 
 func (a *API) registerLearnerRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/v1/students/{studentID}/invitation", a.admin(a.createStudentInvitation))
+	mux.HandleFunc("POST /api/v1/students/{studentID}/invitation", a.records(a.createStudentInvitation))
 	mux.HandleFunc("POST /api/v1/student-invitations/accept", a.limitByIP("token-redeem", a.limits.tokenRedemptionsPerIP, a.acceptStudentInvitation))
 	mux.HandleFunc("GET /api/v1/student/assessments", a.student(a.listStudentAssessments))
 	mux.HandleFunc("GET /api/v1/student/assessments/{assignmentID}", a.student(a.getStudentAssessment))

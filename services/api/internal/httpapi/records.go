@@ -22,12 +22,12 @@ func (a *API) registerRecordRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/v1/classes/{classID}", a.admin(a.updateClass))
 	mux.HandleFunc("DELETE /api/v1/classes/{classID}", a.admin(a.deleteClass))
 	mux.HandleFunc("DELETE /api/v1/classes/{classID}/teachers/{teacherID}", a.admin(a.unassignTeacher))
-	mux.HandleFunc("POST /api/v1/finance/entries/{entryID}/void", a.admin(a.voidFinanceEntry))
+	mux.HandleFunc("POST /api/v1/finance/entries/{entryID}/void", a.financeOffice(a.voidFinanceEntry))
 	mux.HandleFunc("DELETE /api/v1/resources/{resourceID}", a.staffMember(a.deleteResource))
-	mux.HandleFunc("POST /api/v1/academic-records/{recordID}/verification", a.admin(a.verifyAcademicRecord))
-	mux.HandleFunc("DELETE /api/v1/academic-records/{recordID}", a.admin(a.deleteAcademicRecord))
-	mux.HandleFunc("POST /api/v1/external-exams/{examID}/verification", a.admin(a.verifyExternalExam))
-	mux.HandleFunc("DELETE /api/v1/external-exams/{examID}", a.admin(a.deleteExternalExam))
+	mux.HandleFunc("POST /api/v1/academic-records/{recordID}/verification", a.records(a.verifyAcademicRecord))
+	mux.HandleFunc("DELETE /api/v1/academic-records/{recordID}", a.records(a.deleteAcademicRecord))
+	mux.HandleFunc("POST /api/v1/external-exams/{examID}/verification", a.records(a.verifyExternalExam))
+	mux.HandleFunc("DELETE /api/v1/external-exams/{examID}", a.records(a.deleteExternalExam))
 	mux.HandleFunc("POST /api/v1/questions/{questionID}/archive", a.admin(a.archiveQuestion))
 }
 
@@ -193,6 +193,9 @@ func (a *API) unassignTeacher(w http.ResponseWriter, r *http.Request, id auth.Id
 			return true, nil
 		}
 		if _, err = tx.Exec(r.Context(), `UPDATE class_subjects SET teacher_id=NULL WHERE class_id=$1 AND teacher_id=$2`, classID, teacherID); err != nil {
+			return false, err
+		}
+		if _, err = tx.Exec(r.Context(), `UPDATE classes SET homeroom_teacher_id=NULL WHERE id=$1 AND homeroom_teacher_id=$2`, classID, teacherID); err != nil {
 			return false, err
 		}
 		return false, audit(r.Context(), tx, id, "class.teacher_removed", "class", classID, map[string]any{"teacher_id": teacherID})

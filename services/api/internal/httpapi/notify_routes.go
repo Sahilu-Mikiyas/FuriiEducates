@@ -573,6 +573,11 @@ func (a *API) createAnnouncement(w http.ResponseWriter, r *http.Request, id auth
 		writeError(w, 400, "VALIDATION_ERROR", "Invalid JSON request.", nil)
 		return
 	}
+	a.sendAnnouncement(w, r, id, req)
+}
+
+// sendAnnouncement checks, counts or sends an announcement.
+func (a *API) sendAnnouncement(w http.ResponseWriter, r *http.Request, id auth.Identity, req announcementRequest) {
 	req.Title, req.Body = strings.TrimSpace(req.Title), strings.TrimSpace(req.Body)
 	if req.Title == "" || len([]rune(req.Title)) > 120 || req.Body == "" || len([]rune(req.Body)) > 2000 {
 		writeError(w, 400, "VALIDATION_ERROR", "Write a title of up to 120 characters and a message of up to 2,000.", nil)

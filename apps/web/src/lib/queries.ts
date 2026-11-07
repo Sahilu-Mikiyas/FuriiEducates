@@ -23,6 +23,8 @@ export const useNodes = (subjectID: string) => useResource<CurriculumNode[]>(`/s
 export const useQuestions = () => useResource<Question[]>('/questions')
 export const useAssessments = () => useResource<Assessment[]>('/assessments')
 export const useStaff = () => useResource<StaffMember[]>('/staff')
+// useAllStaff includes office staff and administrators, with their roles.
+export const useAllStaff = () => useResource<StaffMember[]>('/staff?all=1')
 export const useStaffInvitations = () => useResource<StaffInvitation[]>('/staff/invitations')
 export const useDemoRequests = () => useResource<DemoRequest[]>('/platform/demo-requests')
 export const useAcademicRecords = (studentID: string) => useResource<AcademicRecord[]>(`/students/${studentID}/academic-records`, Boolean(studentID))

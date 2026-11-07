@@ -24,7 +24,7 @@ const (
 
 func (a *API) registerLearningRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/student/learning-plan", a.student(a.studentLearningPlan))
-	mux.HandleFunc("GET /api/v1/students/{studentID}/learning-plan", a.staffMember(a.staffLearningPlan))
+	mux.HandleFunc("GET /api/v1/students/{studentID}/learning-plan", a.staffOrRecords(a.staffLearningPlan))
 }
 
 type learningTopic struct {

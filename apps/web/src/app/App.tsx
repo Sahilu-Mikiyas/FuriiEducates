@@ -9,6 +9,7 @@ import type { Identity } from '../lib/types'
 import InvitePage from '../pages/public/InvitePage'
 import LoginPage from '../pages/public/LoginPage'
 import { homePath, useSession } from './session'
+import { officeRoles } from '../lib/roles'
 import { Loading } from './shared'
 
 // Each workspace loads only when opened, which matters on school connections.
@@ -70,11 +71,11 @@ const OfflineSittingRoute = lazy(() => learnerWorkspace().then((m) => ({ default
 
 // RequireRole shows `render` to a signed-in user with the role, sends anyone
 // else to sign in, and sends other roles to their own workspace.
-function RequireRole({ role, render }: { role: string; render: (identity: Identity) => ReactNode }) {
+function RequireRole({ role, render }: { role: string | string[]; render: (identity: Identity) => ReactNode }) {
   const { identity, loading } = useSession()
   if (loading) return <Loading />
   if (!identity) return <Navigate to="/login" replace />
-  if (!identity.roles.includes(role)) return <Navigate to={homePath(identity)} replace />
+  if (!identity.roles.some((r) => (Array.isArray(role) ? role : [role]).includes(r))) return <Navigate to={homePath(identity)} replace />
   return <>{render(identity)}</>
 }
 
@@ -117,7 +118,7 @@ export function App() {
     <Routes>
       <Route path="/" element={<MarketingLanding />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/admin" element={<RequireRole role="school_admin" render={(user) => <AdminLayout identity={user} />} />}>
+      <Route path="/admin" element={<RequireRole role={officeRoles} render={(user) => <AdminLayout identity={user} />} />}>
         <Route index element={<Navigate to="overview" replace />} />
         <Route path="overview" element={<OverviewPage />} />
         <Route path="students" element={<StudentsPage />} />

@@ -25,13 +25,13 @@ type academicRecordInput struct {
 }
 
 func (a *API) registerAcademicRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/students/{studentID}/academic-records", a.admin(a.listAcademicRecords))
-	mux.HandleFunc("POST /api/v1/students/{studentID}/academic-records", a.admin(a.createAcademicRecord))
-	mux.HandleFunc("GET /api/v1/students/{studentID}/external-exams", a.admin(a.listExternalExams))
-	mux.HandleFunc("POST /api/v1/students/{studentID}/external-exams", a.admin(a.createExternalExam))
-	mux.HandleFunc("POST /api/v1/import-jobs/preview", a.admin(a.previewAcademicImport))
-	mux.HandleFunc("GET /api/v1/import-jobs/{jobID}", a.admin(a.getImportJob))
-	mux.HandleFunc("POST /api/v1/import-jobs/{jobID}/commit", a.admin(a.commitImportJob))
+	mux.HandleFunc("GET /api/v1/students/{studentID}/academic-records", a.records(a.listAcademicRecords))
+	mux.HandleFunc("POST /api/v1/students/{studentID}/academic-records", a.records(a.createAcademicRecord))
+	mux.HandleFunc("GET /api/v1/students/{studentID}/external-exams", a.records(a.listExternalExams))
+	mux.HandleFunc("POST /api/v1/students/{studentID}/external-exams", a.records(a.createExternalExam))
+	mux.HandleFunc("POST /api/v1/import-jobs/preview", a.records(a.previewAcademicImport))
+	mux.HandleFunc("GET /api/v1/import-jobs/{jobID}", a.records(a.getImportJob))
+	mux.HandleFunc("POST /api/v1/import-jobs/{jobID}/commit", a.records(a.commitImportJob))
 }
 
 func (a *API) listAcademicRecords(w http.ResponseWriter, r *http.Request, id auth.Identity) {

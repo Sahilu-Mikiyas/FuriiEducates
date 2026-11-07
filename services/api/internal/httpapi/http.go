@@ -82,6 +82,7 @@ func (a *API) routes() http.Handler {
 	a.registerRecordRoutes(mux)
 	a.registerNotificationRoutes(mux)
 	a.registerYearEndRoutes(mux)
+	a.registerRoleRoutes(mux)
 	return a.observe(a.cors(mux))
 }
 
@@ -384,7 +385,7 @@ func (a *API) requireRole(next func(http.ResponseWriter, *http.Request, auth.Ide
 
 // signedIn allows any authenticated account, whatever its role.
 func (a *API) signedIn(next func(http.ResponseWriter, *http.Request, auth.Identity)) http.HandlerFunc {
-	return a.requireRole(next, "This account has no active role.", "school_admin", "teacher", "student", "parent")
+	return a.requireRole(next, "This account has no active role.", "school_admin", "teacher", "student", "parent", "registrar", "finance_officer")
 }
 
 // pathIDsValid reports whether every wildcard in the matched route pattern is

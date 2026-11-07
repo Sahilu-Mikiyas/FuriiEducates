@@ -21,7 +21,7 @@ func (a *API) registerPasswordRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/password", a.signedIn(a.changePassword))
 	mux.HandleFunc("POST /api/v1/auth/password-reset/complete", a.limitByIP("token-redeem", a.limits.tokenRedemptionsPerIP, a.completePasswordReset))
 	mux.HandleFunc("POST /api/v1/staff/{staffID}/password-reset", a.admin(a.createStaffPasswordReset))
-	mux.HandleFunc("POST /api/v1/students/{studentID}/password-reset", a.admin(a.createStudentPasswordReset))
+	mux.HandleFunc("POST /api/v1/students/{studentID}/password-reset", a.records(a.createStudentPasswordReset))
 	mux.HandleFunc("POST /api/v1/platform/password-resets", a.admin(a.demoRequestAdmin(a.createOperatorPasswordReset)))
 }
 

@@ -1,3 +1,4 @@
+import { isOffice, officeHome } from '../lib/roles'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { clearOfflinePacks } from '../features/prep/offlineStore'
@@ -68,7 +69,7 @@ export function useSession(enabled = true) {
 
 export const homePath = (identity: Identity) => {
   if (identity.roles.includes('student')) return '/learn'
-  if (identity.roles.includes('school_admin')) return '/admin/overview'
+  if (isOffice(identity)) return officeHome(identity)
   if (identity.roles.includes('teacher')) return '/teach/class'
   return '/family'
 }

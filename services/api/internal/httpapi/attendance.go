@@ -30,7 +30,7 @@ var attendanceStatuses = []string{"present", "absent", "late", "excused"}
 func (a *API) registerAttendanceRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/attendance/classes/{classID}", a.staffMember(a.getClassRegister))
 	mux.HandleFunc("PUT /api/v1/attendance/classes/{classID}", a.staffMember(a.saveClassRegister))
-	mux.HandleFunc("GET /api/v1/attendance/overview", a.admin(a.attendanceOverview))
+	mux.HandleFunc("GET /api/v1/attendance/overview", a.records(a.attendanceOverview))
 	mux.HandleFunc("GET /api/v1/attendance/alerts", a.staffMember(a.attendanceAlerts))
 	mux.HandleFunc("GET /api/v1/attendance/report", a.staffMember(a.attendanceReport))
 	mux.HandleFunc("GET /api/v1/student/attendance", a.student(a.studentAttendance))

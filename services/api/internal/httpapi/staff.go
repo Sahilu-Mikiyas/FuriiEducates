@@ -18,7 +18,7 @@ import (
 const staffInviteTTL = 7 * 24 * time.Hour
 
 func (a *API) registerStaffRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/staff", a.admin(a.listStaff))
+	mux.HandleFunc("GET /api/v1/staff", a.financeOffice(a.listStaff))
 	mux.HandleFunc("GET /api/v1/staff/invitations", a.admin(a.listStaffInvitations))
 	mux.HandleFunc("POST /api/v1/staff/invitations", a.admin(a.createStaffInvitation))
 	mux.HandleFunc("POST /api/v1/staff/invitations/{invitationID}/revoke", a.admin(a.revokeStaffInvitation))
@@ -36,14 +36,16 @@ func (a *API) teacher(next func(http.ResponseWriter, *http.Request, auth.Identit
 func (a *API) listStaff(w http.ResponseWriter, r *http.Request, id auth.Identity) {
 	rows, err := a.db.Query(r.Context(), `
 		SELECT u.id::text, u.email, u.display_name, u.status,
-		       COALESCE(array_agg(ct.class_id::text ORDER BY ct.assigned_at) FILTER (WHERE ct.class_id IS NOT NULL), '{}')
+		       COALESCE(array_agg(DISTINCT ct.class_id::text) FILTER (WHERE ct.class_id IS NOT NULL), '{}'),
+		       (SELECT array_agg(r.role ORDER BY r.role) FROM user_roles r WHERE r.user_id = u.id),
+		       COALESCE((SELECT array_agg(c.id::text) FROM classes c WHERE c.homeroom_teacher_id = u.id), '{}')
 		FROM users u
-		JOIN user_roles ur ON ur.user_id = u.id AND ur.role = 'teacher'
 		LEFT JOIN class_teachers ct ON ct.teacher_id = u.id AND ct.school_id = u.school_id
-		WHERE u.school_id = $1
+		WHERE u.school_id = $1 AND EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.role = ANY($2::text[]))
+		  AND NOT EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.role IN ('student','parent'))
 		GROUP BY u.id
 		ORDER BY lower(u.display_name), lower(u.email)
-		LIMIT 500`, id.SchoolID)
+		LIMIT 500`, id.SchoolID, map[bool][]string{true: staffRoles, false: {"teacher"}}[r.URL.Query().Get("all") == "1"])
 	if err != nil {
 		a.serverError(w, r, err)
 		return
@@ -56,11 +58,13 @@ func (a *API) listStaff(w http.ResponseWriter, r *http.Request, id auth.Identity
 		DisplayName string   `json:"display_name"`
 		Status      string   `json:"status"`
 		ClassIDs    []string `json:"class_ids"`
+		Roles       []string `json:"roles"`
+		Homeroom    []string `json:"homeroom_class_ids"`
 	}
 	items := []staffMember{}
 	for rows.Next() {
 		var item staffMember
-		if err := rows.Scan(&item.ID, &item.Email, &item.DisplayName, &item.Status, &item.ClassIDs); err != nil {
+		if err := rows.Scan(&item.ID, &item.Email, &item.DisplayName, &item.Status, &item.ClassIDs, &item.Roles, &item.Homeroom); err != nil {
 			a.serverError(w, r, err)
 			return
 		}
@@ -108,9 +112,17 @@ func (a *API) listStaffInvitations(w http.ResponseWriter, r *http.Request, id au
 func (a *API) createStaffInvitation(w http.ResponseWriter, r *http.Request, id auth.Identity) {
 	var req struct {
 		Email string `json:"email"`
+		Role  string `json:"role"`
 	}
 	if !decode(w, r, &req) {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON request.", nil)
+		return
+	}
+	if req.Role == "" {
+		req.Role = "teacher"
+	}
+	if req.Role != "teacher" && req.Role != "registrar" && req.Role != "finance_officer" {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Choose teacher, registrar or finance officer.", map[string]string{"role": "Unknown role."})
 		return
 	}
 	email := strings.ToLower(strings.TrimSpace(req.Email))
@@ -146,7 +158,7 @@ func (a *API) createStaffInvitation(w http.ResponseWriter, r *http.Request, id a
 	var invitationID string
 	err = tx.QueryRow(r.Context(), `
 		INSERT INTO staff_invitations (school_id,email,role,token_hash,created_by,expires_at)
-		VALUES ($1,$2,'teacher',$3,$4,$5) RETURNING id::text`, id.SchoolID, email, tokenHash[:], id.UserID, expiresAt).Scan(&invitationID)
+		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id::text`, id.SchoolID, email, req.Role, tokenHash[:], id.UserID, expiresAt).Scan(&invitationID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -161,7 +173,7 @@ func (a *API) createStaffInvitation(w http.ResponseWriter, r *http.Request, id a
 		a.serverError(w, r, err)
 		return
 	}
-	_, err = tx.Exec(r.Context(), `INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'staff.invited','staff_invitation',$3,jsonb_build_object('email',$4::text,'role','teacher'))`, id.SchoolID, id.UserID, invitationID, email)
+	_, err = tx.Exec(r.Context(), `INSERT INTO audit_logs(school_id,actor_user_id,action,entity_type,entity_id,changes) VALUES($1,$2,'staff.invited','staff_invitation',$3,jsonb_build_object('email',$4::text,'role',$5::text))`, id.SchoolID, id.UserID, invitationID, email, req.Role)
 	if err != nil {
 		a.serverError(w, r, err)
 		return
@@ -171,7 +183,7 @@ func (a *API) createStaffInvitation(w http.ResponseWriter, r *http.Request, id a
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"data": map[string]any{
-		"id": invitationID, "email": email, "role": "teacher", "token": token,
+		"id": invitationID, "email": email, "role": req.Role, "token": token,
 		"expires_at": expiresAt.Format(time.RFC3339), "emailed": emailed,
 	}})
 }
@@ -204,6 +216,10 @@ func (a *API) updateStaffStatus(w http.ResponseWriter, r *http.Request, id auth.
 		return
 	}
 	staffID := r.PathValue("staffID")
+	if staffID == id.UserID && req.Status == "disabled" {
+		writeError(w, http.StatusConflict, "OWN_ACCOUNT", "You cannot disable your own account.", nil)
+		return
+	}
 	tx, err := a.db.Begin(r.Context())
 	if err != nil {
 		a.serverError(w, r, err)
@@ -214,11 +230,11 @@ func (a *API) updateStaffStatus(w http.ResponseWriter, r *http.Request, id auth.
 	err = tx.QueryRow(r.Context(), `
 		UPDATE users u SET status=$3
 		WHERE u.id=$1 AND u.school_id=$2 AND EXISTS (
-			SELECT 1 FROM user_roles ur WHERE ur.user_id=u.id AND ur.role='teacher'
-		)
-		RETURNING u.email`, staffID, id.SchoolID, req.Status).Scan(&email)
+			SELECT 1 FROM user_roles ur WHERE ur.user_id=u.id AND ur.role=ANY($4::text[])
+		) AND NOT EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id=u.id AND ur.role IN ('student','parent'))
+		RETURNING u.email`, staffID, id.SchoolID, req.Status, staffRoles).Scan(&email)
 	if errors.Is(err, pgx.ErrNoRows) {
-		writeError(w, http.StatusNotFound, "NOT_FOUND", "Teacher account was not found in this school.", nil)
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "Staff account was not found in this school.", nil)
 		return
 	}
 	if err != nil {
@@ -353,7 +369,7 @@ func (a *API) assignTeacher(w http.ResponseWriter, r *http.Request, id auth.Iden
 
 func (a *API) listTeacherClasses(w http.ResponseWriter, r *http.Request, id auth.Identity) {
 	rows, err := a.db.Query(r.Context(), `
-		SELECT c.id::text,c.name,c.grade_level,c.academic_year_id::text,y.name
+		SELECT c.id::text,c.name,c.grade_level,c.academic_year_id::text,y.name,COALESCE(c.homeroom_teacher_id=ct.teacher_id,false)
 		FROM class_teachers ct
 		JOIN classes c ON c.id=ct.class_id AND c.school_id=ct.school_id
 		JOIN academic_years y ON y.id=c.academic_year_id AND y.school_id=c.school_id
@@ -364,14 +380,15 @@ func (a *API) listTeacherClasses(w http.ResponseWriter, r *http.Request, id auth
 		return
 	}
 	defer rows.Close()
-	items := []map[string]string{}
+	items := []map[string]any{}
 	for rows.Next() {
 		var classID, name, grade, yearID, yearName string
-		if err := rows.Scan(&classID, &name, &grade, &yearID, &yearName); err != nil {
+		var homeroom bool
+		if err := rows.Scan(&classID, &name, &grade, &yearID, &yearName, &homeroom); err != nil {
 			a.serverError(w, r, err)
 			return
 		}
-		items = append(items, map[string]string{"id": classID, "name": name, "grade_level": grade, "academic_year_id": yearID, "academic_year_name": yearName})
+		items = append(items, map[string]any{"id": classID, "name": name, "grade_level": grade, "academic_year_id": yearID, "academic_year_name": yearName, "homeroom": homeroom})
 	}
 	if err := rows.Err(); err != nil {
 		a.serverError(w, r, err)

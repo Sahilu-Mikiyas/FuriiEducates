@@ -543,6 +543,18 @@ func (a *API) saveReportNotes(w http.ResponseWriter, r *http.Request, id auth.Id
 	if !a.reportTerm(w, r, id, classID, req.TermID) || a.refuseClosedClass(w, r, id.SchoolID, classID) {
 		return
 	}
+	// When a class has a homeroom teacher, the comments are theirs to write.
+	if !hasRole(id.Roles, "school_admin") {
+		homeroom, err := homeroomOf(r.Context(), a.db, id.SchoolID, classID)
+		if err != nil {
+			a.serverError(w, r, err)
+			return
+		}
+		if homeroom != "" && homeroom != id.UserID {
+			writeError(w, 403, "HOMEROOM_ONLY", "The homeroom teacher writes this class's report card comments.", nil)
+			return
+		}
+	}
 	if len(req.Notes) == 0 || len(req.Notes) > 1000 {
 		writeError(w, 400, "VALIDATION_ERROR", "Enter at least one note.", nil)
 		return

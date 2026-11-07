@@ -17,9 +17,9 @@ import (
 )
 
 func (a *API) registerParentRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/v1/students/{studentID}/guardians/{guardianID}/invitation", a.admin(a.inviteGuardian))
-	mux.HandleFunc("POST /api/v1/students/{studentID}/guardians/{guardianID}/password-reset", a.admin(a.resetGuardianPassword))
-	mux.HandleFunc("DELETE /api/v1/students/{studentID}/guardians/{guardianID}/account", a.admin(a.removeGuardianAccess))
+	mux.HandleFunc("POST /api/v1/students/{studentID}/guardians/{guardianID}/invitation", a.records(a.inviteGuardian))
+	mux.HandleFunc("POST /api/v1/students/{studentID}/guardians/{guardianID}/password-reset", a.records(a.resetGuardianPassword))
+	mux.HandleFunc("DELETE /api/v1/students/{studentID}/guardians/{guardianID}/account", a.records(a.removeGuardianAccess))
 	mux.HandleFunc("POST /api/v1/guardian-invitations/accept", a.limitByIP("token-redeem", a.limits.tokenRedemptionsPerIP, a.acceptGuardianInvitation))
 	mux.HandleFunc("GET /api/v1/parent/children", a.parent(a.listChildren))
 	mux.HandleFunc("GET /api/v1/parent/children/{studentID}", a.parent(a.getChild))

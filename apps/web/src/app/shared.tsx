@@ -1,3 +1,4 @@
+import { isOffice, officeHome } from '../lib/roles'
 import { Component, ReactNode, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { languages, Language, useI18n } from '../i18n'
@@ -57,7 +58,7 @@ export function PageLoading() {
 export function WorkspaceLinks({ identity, current }: { identity: Identity; current: 'admin' | 'teacher' | 'parent' }) {
   const { t } = useI18n()
   return <>
-    {current !== 'admin' && identity.roles.includes('school_admin') && <Link className="workspace-link" to="/admin/overview">{t('workspace.openAdmin')}</Link>}
+    {current !== 'admin' && isOffice(identity) && <Link className="workspace-link" to={officeHome(identity)}>{t(identity.roles.includes('school_admin') ? 'workspace.openAdmin' : 'workspace.openOffice')}</Link>}
     {current !== 'teacher' && identity.roles.includes('teacher') && <Link className="workspace-link" to="/teach/class">{t('workspace.openTeacher')}</Link>}
     {current !== 'parent' && identity.roles.includes('parent') && <Link className="workspace-link" to="/family">{t('workspace.openParent')}</Link>}
   </>

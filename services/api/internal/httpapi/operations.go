@@ -20,9 +20,9 @@ const maxTeachingResourceBytes = 15 << 20
 var errTeacherClassNotAssigned = errors.New("teacher class is not assigned")
 
 func (a *API) registerOperationsRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/finance/entries", a.admin(a.listFinanceEntries))
-	mux.HandleFunc("POST /api/v1/finance/entries", a.admin(a.createFinanceEntry))
-	mux.HandleFunc("GET /api/v1/finance/summary", a.admin(a.financeSummary))
+	mux.HandleFunc("GET /api/v1/finance/entries", a.financeOffice(a.listFinanceEntries))
+	mux.HandleFunc("POST /api/v1/finance/entries", a.financeOffice(a.createFinanceEntry))
+	mux.HandleFunc("GET /api/v1/finance/summary", a.financeOffice(a.financeSummary))
 	mux.HandleFunc("GET /api/v1/teacher/lesson-plans", a.teacher(a.listLessonPlans))
 	mux.HandleFunc("POST /api/v1/teacher/lesson-plans", a.teacher(a.saveLessonPlan))
 	mux.HandleFunc("GET /api/v1/teacher/lesson-plans/{planID}", a.teacher(a.getLessonPlan))

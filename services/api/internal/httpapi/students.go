@@ -32,13 +32,13 @@ var (
 )
 
 func (a *API) registerStudentRecordRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/students/{studentID}/profile", a.staffMember(a.getStudentProfile))
-	mux.HandleFunc("PUT /api/v1/students/{studentID}/profile", a.admin(a.updateStudentProfile))
-	mux.HandleFunc("POST /api/v1/students/{studentID}/guardians", a.admin(a.createGuardian))
-	mux.HandleFunc("PUT /api/v1/students/{studentID}/guardians/{guardianID}", a.admin(a.updateGuardian))
-	mux.HandleFunc("DELETE /api/v1/students/{studentID}/guardians/{guardianID}", a.admin(a.deleteGuardian))
-	mux.HandleFunc("POST /api/v1/students/{studentID}/move", a.admin(a.moveStudent))
-	mux.HandleFunc("POST /api/v1/students/import", a.admin(a.importStudents))
+	mux.HandleFunc("GET /api/v1/students/{studentID}/profile", a.staffOrRecords(a.getStudentProfile))
+	mux.HandleFunc("PUT /api/v1/students/{studentID}/profile", a.records(a.updateStudentProfile))
+	mux.HandleFunc("POST /api/v1/students/{studentID}/guardians", a.records(a.createGuardian))
+	mux.HandleFunc("PUT /api/v1/students/{studentID}/guardians/{guardianID}", a.records(a.updateGuardian))
+	mux.HandleFunc("DELETE /api/v1/students/{studentID}/guardians/{guardianID}", a.records(a.deleteGuardian))
+	mux.HandleFunc("POST /api/v1/students/{studentID}/move", a.records(a.moveStudent))
+	mux.HandleFunc("POST /api/v1/students/import", a.records(a.importStudents))
 }
 
 // canSeeStudent allows an administrator, or a teacher of the student's current
@@ -47,7 +47,7 @@ func (a *API) canSeeStudent(ctx context.Context, id auth.Identity, studentID str
 	var allowed bool
 	err := a.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM students s WHERE s.id=$1 AND s.school_id=$2 AND ($3
 		OR EXISTS(SELECT 1 FROM enrollments e JOIN class_teachers ct ON ct.class_id=e.class_id AND ct.school_id=e.school_id WHERE e.student_id=s.id AND e.school_id=s.school_id AND e.status='active' AND ct.teacher_id=$4)))`,
-		studentID, id.SchoolID, hasRole(id.Roles, "school_admin"), id.UserID).Scan(&allowed)
+		studentID, id.SchoolID, seesAllStudents(id), id.UserID).Scan(&allowed)
 	return allowed, err
 }
 

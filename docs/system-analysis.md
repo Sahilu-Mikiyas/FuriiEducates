@@ -224,6 +224,32 @@ Not built yet: notices to families about promotion, and moving students in the m
 
 Next: named roles.
 
+**2026-11-07 — Pilot readiness, part 4: named roles.**
+
+- The office workspace now serves three roles, and a person can hold several, for example a teacher who is also the registrar:
+  - **Administrator (director)** can do everything, as before.
+  - **Registrar** keeps student records. They:
+    - admit and edit students, and import them;
+    - manage families and their accounts;
+    - move students between classes and invite students;
+    - keep past results and imports;
+    - follow up attendance.
+
+    They see only Students, Attendance and Academic history.
+  - **Finance officer** keeps the ledger. They see only Finance, and can look up students and staff for it.
+- The server checks each role on every request. Neither office role can change the school's set-up, staff, teaching or messages.
+- Staff invitations name the role. The Staff page lists everyone with their roles, and an administrator can change them there. An administrator cannot remove their own administrator role or disable their own account, and the school always keeps an active administrator. Class pickers still list teachers only.
+- **Homeroom teacher:** one teacher of a class, marked with a star on the Staff page.
+  - When a class has one, only they (or an administrator) write its report card comments.
+  - They can message the class's students and families from their class page, in the app and by email or Telegram. SMS stays with the office.
+  - Taking the teacher off the class ends the homeroom.
+- Every account, office roles included, gets the notification inbox.
+- New API tests cover what each role may and may not do, role changes and their limits, and the homeroom rules. The browser run covered inviting each role, what each one sees, the homeroom star and message, and role changes, under the security policy.
+
+Not built yet: a read-only deputy role, and per-role limits on announcements beyond SMS.
+
+Pilot readiness parts 1 to 4 are done. Still needed from the team: provider accounts for email, SMS and Telegram; the uptime ping or a paid Render plan; an Amharic review; real-phone tests.
+
 ---
 
 ## 1. What the system is today

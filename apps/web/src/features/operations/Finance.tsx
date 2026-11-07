@@ -4,7 +4,7 @@ import { DateField } from '../../calendar/DateField'
 import { useDates } from '../../calendar/useDates'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
-import { useRefresh, useStaff, useStudents } from '../../lib/queries'
+import { useAllStaff, useRefresh, useStudents } from '../../lib/queries'
 import type { FinanceEntry, FinanceSummary, FinanceTotals } from '../../lib/types'
 import { money } from '../../lib/money'
 
@@ -15,7 +15,7 @@ export function FinanceWorkspace() {
   const { busy, run, onSubmit } = useAction()
   const refresh = useRefresh()
   const students = useStudents().data ?? []
-  const staff = useStaff().data ?? []
+  const staff = useAllStaff().data ?? []
   const summary = useQuery({ queryKey: ['/finance/summary'], queryFn: () => api<FinanceSummary>('/finance/summary') }).data
   const entries = useQuery({ queryKey: ['/finance/entries'], queryFn: () => api<FinanceEntry[]>('/finance/entries') }).data ?? []
 

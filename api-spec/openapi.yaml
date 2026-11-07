@@ -4,6 +4,7 @@ info:
   version: 1.0.0
 servers:
   - url: /api/v1
+# Office roles: the registrar may use the student, guardian, class move, academic history, import and attendance overview endpoints; the finance officer the finance endpoints and GET /staff; both may read /students, /classes, /academic-years and /school. GET /staff lists teachers; ?all=1 lists every staff member with roles. POST /staff/invitations takes an optional role (teacher, registrar, finance_officer).
 paths:
   /auth/login:
     post:
@@ -1920,6 +1921,30 @@ paths:
       responses:
         '200': { description: Success }
         '401': { description: Authentication required }
+  /staff/{staffID}/roles:
+    put:
+      summary: "Replace a staff member's roles: {\"roles\": [school_admin, teacher, registrar, finance_officer]}. An administrator cannot remove their own role, and the school keeps an active administrator (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+        '403': { description: Not allowed for this role }
+  /classes/{classID}/homeroom:
+    put:
+      summary: "Name one of the class's teachers its homeroom teacher, or clear it with an empty teacher_id (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+        '403': { description: Not allowed for this role }
+  /teacher/classes/{classID}/announcements:
+    post:
+      summary: "The homeroom teacher messages the class's students and families, in the app and by email or Telegram, not SMS (homeroom teacher)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201': { description: Success }
+        '401': { description: Authentication required }
+        '403': { description: Not allowed for this role }
 components:
   securitySchemes:
     sessionCookie:

@@ -20,7 +20,7 @@ export default function LoginPage() {
     setBusy(true); setError('')
     try {
       const user = await api<Identity>('/auth/login', { method: 'POST', body: JSON.stringify({ email: form.get('email'), password: form.get('password') }) })
-      if (!user.roles.some((role) => role === 'school_admin' || role === 'teacher' || role === 'student' || role === 'parent')) {
+      if (!user.roles.some((role) => ['school_admin', 'teacher', 'student', 'parent', 'registrar', 'finance_officer'].includes(role))) {
         await api('/auth/logout', { method: 'POST' })
         throw new Error(t('login.roleNotEnabled'))
       }

@@ -1,5 +1,5 @@
 import { Suspense, useEffect } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router'
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router'
 import { Toast, useFeedback } from '../../app/feedback'
 import { useLogout } from '../../app/session'
 import { Brand, LanguageSwitch, PageLoading, WorkspaceLinks } from '../../app/shared'
@@ -9,6 +9,7 @@ import { useI18n } from '../../i18n'
 import { useSchool, useStudents } from '../../lib/queries'
 import type { Identity } from '../../lib/types'
 import { adminPages, AdminPageID } from './pages'
+import { canOpenOfficePage, officeHome } from '../../lib/roles'
 
 export default function AdminLayout({ identity }: { identity: Identity }) {
   const { t } = useI18n()
@@ -24,8 +25,12 @@ export default function AdminLayout({ identity }: { identity: Identity }) {
 
   const slug = pathname.replace(/^\/admin\/?/, '').split('/')[0]
   const page = (adminPages.some((item) => item.id === slug) || slug === 'notifications' ? slug : 'overview') as AdminPageID | 'notifications'
-  const visible = adminPages.filter((item) => item.id !== 'demo-requests' || identity.platform_operator)
+  const visible = adminPages.filter((item) => (item.id !== 'demo-requests' || identity.platform_operator) && canOpenOfficePage(identity, item.id))
+  const isAdmin = identity.roles.includes('school_admin')
+  const roleName = isAdmin ? t('admin.role') : identity.roles.filter((r) => r === 'registrar' || r === 'finance_officer').map((r) => t(`role.${r}` as 'role.registrar')).join(' · ')
   const initial = identity.display_name.slice(0, 1).toUpperCase()
+
+  if (!canOpenOfficePage(identity, slug || 'overview')) return <Navigate to={officeHome(identity)} replace />
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -44,7 +49,7 @@ export default function AdminLayout({ identity }: { identity: Identity }) {
         <WorkspaceLinks identity={identity} current="admin" />
         <div className="user-chip">
           <div className="user-avatar">{initial}</div>
-          <div><strong>{identity.display_name}</strong><span>{t('admin.role')}</span></div>
+          <div><strong>{identity.display_name}</strong><span>{roleName}</span></div>
           <button aria-label={t('common.signOut')} title={t('common.signOut')} onClick={() => void logout()}>↗</button>
         </div>
       </div>

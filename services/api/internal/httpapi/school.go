@@ -39,18 +39,18 @@ func (a *API) registerSchoolRoutes(mux *http.ServeMux) {
 	a.registerOperationsRoutes(mux)
 	a.registerPasswordRoutes(mux)
 	a.registerExamRoutes(mux)
-	mux.HandleFunc("GET /api/v1/school", a.admin(a.getSchool))
+	mux.HandleFunc("GET /api/v1/school", a.office(a.getSchool))
 	mux.HandleFunc("GET /api/v1/school/setup-profile", a.admin(a.getSchoolSetupProfile))
 	mux.HandleFunc("GET /api/v1/school/learning-summary", a.admin(a.getSchoolLearningSummary))
 	mux.HandleFunc("PATCH /api/v1/school", a.admin(a.updateSchool))
-	mux.HandleFunc("GET /api/v1/academic-years", a.admin(a.listAcademicYears))
+	mux.HandleFunc("GET /api/v1/academic-years", a.office(a.listAcademicYears))
 	mux.HandleFunc("POST /api/v1/academic-years", a.admin(a.createAcademicYear))
-	mux.HandleFunc("GET /api/v1/classes", a.admin(a.listClasses))
+	mux.HandleFunc("GET /api/v1/classes", a.office(a.listClasses))
 	mux.HandleFunc("POST /api/v1/classes", a.admin(a.createClass))
-	mux.HandleFunc("GET /api/v1/students", a.admin(a.listStudents))
-	mux.HandleFunc("POST /api/v1/students", a.admin(a.createStudent))
-	mux.HandleFunc("GET /api/v1/students/{studentID}", a.admin(a.getStudent))
-	mux.HandleFunc("PATCH /api/v1/students/{studentID}", a.admin(a.updateStudent))
+	mux.HandleFunc("GET /api/v1/students", a.office(a.listStudents))
+	mux.HandleFunc("POST /api/v1/students", a.records(a.createStudent))
+	mux.HandleFunc("GET /api/v1/students/{studentID}", a.office(a.getStudent))
+	mux.HandleFunc("PATCH /api/v1/students/{studentID}", a.records(a.updateStudent))
 }
 
 func (a *API) getSchoolLearningSummary(w http.ResponseWriter, r *http.Request, id auth.Identity) {
@@ -215,7 +215,7 @@ func (a *API) createAcademicYear(w http.ResponseWriter, r *http.Request, id auth
 
 func (a *API) listClasses(w http.ResponseWriter, r *http.Request, id auth.Identity) {
 	// Classes of closed years are left out unless ?all=1, so pickers show this year.
-	rows, err := a.db.Query(r.Context(), `SELECT c.id::text,c.name,c.grade_level,c.academic_year_id::text,y.name,y.closed_at IS NOT NULL FROM classes c JOIN academic_years y ON y.id=c.academic_year_id AND y.school_id=c.school_id
+	rows, err := a.db.Query(r.Context(), `SELECT c.id::text,c.name,c.grade_level,c.academic_year_id::text,y.name,y.closed_at IS NOT NULL,COALESCE(c.homeroom_teacher_id::text,'') FROM classes c JOIN academic_years y ON y.id=c.academic_year_id AND y.school_id=c.school_id
 		WHERE c.school_id=$1 AND ($2 OR y.closed_at IS NULL) ORDER BY y.starts_on DESC,c.grade_level,c.name LIMIT 500`, id.SchoolID, r.URL.Query().Get("all") == "1")
 	if err != nil {
 		a.serverError(w, r, err)
@@ -226,11 +226,12 @@ func (a *API) listClasses(w http.ResponseWriter, r *http.Request, id auth.Identi
 	for rows.Next() {
 		var x [5]string
 		var closed bool
-		if err := rows.Scan(&x[0], &x[1], &x[2], &x[3], &x[4], &closed); err != nil {
+		var homeroom string
+		if err := rows.Scan(&x[0], &x[1], &x[2], &x[3], &x[4], &closed, &homeroom); err != nil {
 			a.serverError(w, r, err)
 			return
 		}
-		items = append(items, map[string]any{"id": x[0], "name": x[1], "grade_level": x[2], "academic_year_id": x[3], "academic_year_name": x[4], "year_closed": closed})
+		items = append(items, map[string]any{"id": x[0], "name": x[1], "grade_level": x[2], "academic_year_id": x[3], "academic_year_name": x[4], "year_closed": closed, "homeroom_teacher_id": homeroom})
 	}
 	if err := rows.Err(); err != nil {
 		a.serverError(w, r, err)
