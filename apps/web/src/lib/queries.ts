@@ -13,6 +13,8 @@ export const useSetupProfile = () => useResource<SchoolSetupProfile | null>('/sc
 export const useYears = () => useResource<Year[]>('/academic-years')
 export const useTerms = () => useResource<Term[]>('/terms')
 export const useClasses = () => useResource<ClassRoom[]>('/classes')
+// useAllClasses includes classes of closed years.
+export const useAllClasses = () => useResource<ClassRoom[]>('/classes?all=1')
 export const useStudents = () => useResource<Student[]>('/students')
 export const useLearningSummary = () => useResource<LearningSummary>('/school/learning-summary')
 export const useCurricula = () => useResource<Curriculum[]>('/curricula')
@@ -33,5 +35,8 @@ export const useLearnerAssignments = () => useResource<LearnerAssignment[]>('/st
 // useRefresh refetches the given API paths after a change.
 export function useRefresh() {
   const client = useQueryClient()
-  return (...paths: string[]) => Promise.all(paths.map((path) => client.invalidateQueries({ queryKey: [path] })))
+  // A path also refreshes its filtered forms, such as /classes?all=1.
+  return (...paths: string[]) => Promise.all(paths.map((path) => client.invalidateQueries({
+    predicate: (query) => typeof query.queryKey[0] === 'string' && (query.queryKey[0] === path || query.queryKey[0].startsWith(`${path}?`)),
+  })))
 }

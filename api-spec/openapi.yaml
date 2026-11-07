@@ -1887,6 +1887,39 @@ paths:
       responses:
         '201': { description: Success }
         '401': { description: Authentication required }
+  /academic-years/{yearID}/copy:
+    post:
+      summary: "Create in the next year ({\"to_year_id\"}) each class of this year with the same grade and name and its subjects; optionally its teachers (\"teachers\": true) and its terms moved to the new dates (\"terms\": true). Safe to run again (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /academic-years/{yearID}/promotion:
+    get:
+      summary: "Classes of this year with the students still enrolled, a suggested decision for each (promote, repeat, graduate) from the last published report card, and suggested classes in the year given by ?to= (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    post:
+      summary: "Move students on: {\"to_year_id\", \"decisions\": [{\"student_id\", \"action\": \"promote|repeat|graduate|leave\", \"class_id\"}]}. Graduates and leavers keep their records and can no longer sign in (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+  /academic-years/{yearID}/close:
+    post:
+      summary: "Close the year: its registers, marks, quizzes and report cards become read-only and its classes leave the class lists. 409 YEAR_HAS_STUDENTS while students remain (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
+    delete:
+      summary: "Reopen a closed year (administrator)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Success }
+        '401': { description: Authentication required }
 components:
   securitySchemes:
     sessionCookie:

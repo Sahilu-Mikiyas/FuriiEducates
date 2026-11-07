@@ -108,7 +108,7 @@ func (a *API) getClassRegister(w http.ResponseWriter, r *http.Request, id auth.I
 
 func (a *API) saveClassRegister(w http.ResponseWriter, r *http.Request, id auth.Identity) {
 	classID := r.PathValue("classID")
-	if !a.requireClass(w, r, id, classID) {
+	if !a.requireClass(w, r, id, classID) || a.refuseClosedClass(w, r, id.SchoolID, classID) {
 		return
 	}
 	var req struct {

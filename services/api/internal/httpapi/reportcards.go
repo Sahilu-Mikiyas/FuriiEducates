@@ -540,7 +540,7 @@ func (a *API) saveReportNotes(w http.ResponseWriter, r *http.Request, id auth.Id
 		return
 	}
 	classID := r.PathValue("classID")
-	if !a.reportTerm(w, r, id, classID, req.TermID) {
+	if !a.reportTerm(w, r, id, classID, req.TermID) || a.refuseClosedClass(w, r, id.SchoolID, classID) {
 		return
 	}
 	if len(req.Notes) == 0 || len(req.Notes) > 1000 {
@@ -615,7 +615,7 @@ func (a *API) publishReports(w http.ResponseWriter, r *http.Request, id auth.Ide
 		return
 	}
 	classID := r.PathValue("classID")
-	if !a.reportTerm(w, r, id, classID, req.TermID) {
+	if !a.reportTerm(w, r, id, classID, req.TermID) || a.refuseClosedClass(w, r, id.SchoolID, classID) {
 		return
 	}
 	tx, err := a.db.Begin(r.Context())
@@ -697,7 +697,7 @@ func (a *API) unpublishReports(w http.ResponseWriter, r *http.Request, id auth.I
 		return
 	}
 	classID := r.PathValue("classID")
-	if !a.reportTerm(w, r, id, classID, req.TermID) {
+	if !a.reportTerm(w, r, id, classID, req.TermID) || a.refuseClosedClass(w, r, id.SchoolID, classID) {
 		return
 	}
 	req.Reason = strings.TrimSpace(req.Reason)

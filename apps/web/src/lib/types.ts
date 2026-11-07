@@ -4,8 +4,8 @@ export type Identity = { user_id: string; school_id: string; display_name: strin
 export type DemoRequest = { id: string; name: string; email: string; school_name: string; role: string; school_size: string; timezone: string; region: string; default_language: string; priorities: string[]; prepared_school_id: string; message: string; status: 'new' | 'contacted' | 'closed'; created_at: string; updated_at: string }
 export type SchoolSetupProfile = { learner_count_band: string; region: string; priorities: string[] }
 export type School = { id: string; name: string; timezone: string; default_language: string }
-export type Year = { id: string; name: string; starts_on: string; ends_on: string }
-export type ClassRoom = { id: string; name: string; grade_level: string; academic_year_id: string; academic_year_name?: string }
+export type Year = { id: string; name: string; starts_on: string; ends_on: string; closed_at?: string; classes?: number; active_students?: number }
+export type ClassRoom = { id: string; name: string; grade_level: string; academic_year_id: string; academic_year_name?: string; year_closed?: boolean }
 export type Student = { id: string; student_number: string; legal_name: string; preferred_language: string; status: string; has_account: boolean; stream?: string; class_id?: string; class_name?: string; grade_level?: string }
 export type Term = { id: string; academic_year_id: string; academic_year_name: string; name: string; starts_on: string; ends_on: string; in_use: boolean }
 export type GradeBand = { label: string; min_percent: number }
@@ -155,3 +155,11 @@ export type Announcement = {
   created_at: string; sent_by: string; deliveries: Record<string, number>
 }
 export type AnnouncementResult = { id: string; recipients: number; channels: Partial<Record<NoticeChannel, Record<string, number>>>; dry_run: boolean }
+
+export type PromotionAction = 'promote' | 'repeat' | 'graduate' | 'leave'
+export type PromotionStudent = { id: string; name: string; student_number: string; average: number | null; pass_percent: number | null; result_from: string; suggestion: PromotionAction }
+export type PromotionClass = {
+  id: string; name: string; grade_level: string; final_grade: boolean; promote_to: string; repeat_in: string
+  create_suggested: { grade_level: string; name: string } | null; students: PromotionStudent[]
+}
+export type PromotionPlan = { from: string; to: string; from_closed: boolean; classes: PromotionClass[]; target_classes: { id: string; name: string; grade_level: string }[] }

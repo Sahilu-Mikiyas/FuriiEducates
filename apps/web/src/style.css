@@ -651,3 +651,30 @@ td>strong+small{display:block;color:#666;font-size:11px}
 @media(max-width:900px){.channel-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.notice-channels{grid-template-columns:1fr}}
 @media(max-width:600px){.channel-cards{grid-template-columns:1fr}.panel-head:has(.log-filters){flex-wrap:wrap}.log-filters{width:100%}.log-filters select{flex:1;width:auto}.message-test{flex-wrap:wrap}.message-test select,.message-test input{flex:1 1 100%}}
 .notice-telegram .link-button{font-size:12px;padding:0}
+/* Year end */
+.three-fields{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:9px;align-items:end}
+.year-pick select,.promotion-targets select,.promotion-class td select{height:36px;border:1px solid #e2e2e2;border-radius:7px;padding:0 8px;background:#fff;font:inherit;font-size:12px}
+.year-pick label,.promotion-targets label{display:grid;gap:6px;font-size:12px;font-weight:600;color:#444}
+.next-year-form{margin-top:14px;padding-top:14px;border-top:1px solid #eee}
+.next-year-form .secondary{justify-self:start}
+.year-copy{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
+.promotion-class{margin-bottom:14px;padding:14px;border:1px solid #ececec;border-radius:10px}
+.promotion-class>header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:10px}
+.promotion-class>header>div:first-child{display:flex;align-items:center;gap:10px}
+.promotion-class h3{margin:0;font-size:14px}
+.promotion-targets{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px}
+.promotion-class td small{display:block;margin-top:3px;font-size:11px;color:#999}
+.promotion-class td strong{color:#333}
+.promotion-class tr.changed td{background:#fffbeb}
+.below-pass{color:#b45309!important;font-weight:600}
+.promotion-summary{display:grid;gap:8px;justify-items:start;margin-top:6px}
+.promotion-summary p{margin:0;font-size:13px;color:#333}
+.promotion-summary .primary{width:auto;min-width:240px}
+.year-close-list>div{grid-template-columns:24px minmax(0,1fr) auto!important;gap:2px 8px}
+.year-close-list>div>small{grid-column:2}
+.year-close-list>div>button{grid-column:3;grid-row:1/span 2}
+@media(max-width:700px){.three-fields{grid-template-columns:1fr}.promotion-targets{width:100%}.promotion-targets label{flex:1 1 100%}.promotion-summary .primary{width:100%}}
+.promotion-class .status-pill,.channel-cards .status-pill{text-transform:none}
+.promotion-class h3,.promotion-targets label,.year-pick label{letter-spacing:normal}
+.year-copy .bank-check{font-size:13px}
+.year-close-list .link-button{font-size:12px}

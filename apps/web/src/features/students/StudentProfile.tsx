@@ -91,7 +91,7 @@ function ProfileForm({ path, student }: { path: string; student: StudentProfileD
         {['female', 'male'].map((value) => <option key={value} value={value}>{label('gender', value)}</option>)}
       </select></label>
       <label>{t('common.col.statusLabel')}<select name="status" defaultValue={student.status}>
-        {['active', 'inactive'].map((value) => <option key={value} value={value}>{label('status', value)}</option>)}
+        {['active', 'inactive', 'graduated', 'left'].map((value) => <option key={value} value={value}>{label('status', value)}</option>)}
       </select></label>
       <label className="profile-wide">{t('profile.address')}<input name="address" defaultValue={student.address} maxLength={500} /></label>
       <label className="profile-wide">{t('profile.medical')}<textarea name="medical_notes" defaultValue={student.medical_notes} maxLength={2000} rows={3} placeholder={t('profile.medicalHelp')} /></label>

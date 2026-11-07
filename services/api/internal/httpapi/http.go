@@ -81,6 +81,7 @@ func (a *API) routes() http.Handler {
 	a.registerQuizRoutes(mux)
 	a.registerRecordRoutes(mux)
 	a.registerNotificationRoutes(mux)
+	a.registerYearEndRoutes(mux)
 	return a.observe(a.cors(mux))
 }
 

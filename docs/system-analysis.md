@@ -201,6 +201,29 @@ Not checked yet: the AfroMessage request format against a real account. It follo
 
 Next: year-end rollover and promotion, then named roles.
 
+**2026-11-07 — Pilot readiness, part 3: year end.**
+
+- A new Year end page in the admin workspace takes the school into the next year in three steps. If the next school year does not exist yet, it is added there first, with dates one year later.
+  1. Copy the classes. Each class of the ending year is created in the next year with the same grade and name and its subjects. Optionally it keeps the same teachers, and copies the terms moved to the new dates. Classes already there are kept, so it is safe to run again.
+  2. Move students on. Each student still in a class gets a suggested decision from their last published report card that year:
+     - below the pass mark: repeat the grade;
+     - in the school's top grade: graduate;
+     - everyone else: promote.
+
+     The administrator can change any decision. The page suggests the class each group joins (the next grade with the same section name) and offers to create a missing one.
+  3. Close the year.
+- Moving a student on records how their place in the old class ended: promoted, repeated, graduated or left. Graduates and leavers keep every record but can no longer sign in, and the students list can show them as graduated or left.
+- Closing a year:
+  - is refused while any student is still in its classes;
+  - makes its registers, marks, quizzes, report notes and report publishing read-only, and keeps new students from being placed in its classes;
+  - takes its classes off class pickers and teachers' class lists. The Classes page still lists them, and reading old records still works;
+  - can be undone: an administrator can reopen the year to correct something.
+- Each step is audited. New API tests cover copying twice, term dates, suggestions from a failing year average, a missing next-grade class, moving, refusals while closed, and reopening. The whole flow ran in Edge under the security policy.
+
+Not built yet: notices to families about promotion, and moving students in the middle of a year in bulk.
+
+Next: named roles.
+
 ---
 
 ## 1. What the system is today

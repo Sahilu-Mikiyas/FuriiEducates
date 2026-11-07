@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -158,20 +159,24 @@ func (a *API) updateSchool(w http.ResponseWriter, r *http.Request, id auth.Ident
 }
 
 func (a *API) listAcademicYears(w http.ResponseWriter, r *http.Request, id auth.Identity) {
-	rows, err := a.db.Query(r.Context(), `SELECT id::text,name,starts_on::text,ends_on::text FROM academic_years WHERE school_id=$1 ORDER BY starts_on DESC LIMIT 100`, id.SchoolID)
+	rows, err := a.db.Query(r.Context(), `SELECT y.id::text,y.name,y.starts_on::text,y.ends_on::text,COALESCE(to_char(y.closed_at AT TIME ZONE 'UTC',`+isoTimestamp+`),''),
+		(SELECT count(*)::int FROM classes c WHERE c.academic_year_id=y.id),
+		(SELECT count(*)::int FROM enrollments e JOIN classes c ON c.id=e.class_id WHERE c.academic_year_id=y.id AND e.status='active')
+		FROM academic_years y WHERE y.school_id=$1 ORDER BY y.starts_on DESC LIMIT 100`, id.SchoolID)
 	if err != nil {
 		a.serverError(w, r, err)
 		return
 	}
 	defer rows.Close()
-	years := []map[string]string{}
+	years := []map[string]any{}
 	for rows.Next() {
-		var x struct{ ID, Name, StartsOn, EndsOn string }
-		if err := rows.Scan(&x.ID, &x.Name, &x.StartsOn, &x.EndsOn); err != nil {
+		var x struct{ ID, Name, StartsOn, EndsOn, ClosedAt string }
+		var classes, students int
+		if err := rows.Scan(&x.ID, &x.Name, &x.StartsOn, &x.EndsOn, &x.ClosedAt, &classes, &students); err != nil {
 			a.serverError(w, r, err)
 			return
 		}
-		years = append(years, map[string]string{"id": x.ID, "name": x.Name, "starts_on": x.StartsOn, "ends_on": x.EndsOn})
+		years = append(years, map[string]any{"id": x.ID, "name": x.Name, "starts_on": x.StartsOn, "ends_on": x.EndsOn, "closed_at": x.ClosedAt, "classes": classes, "active_students": students})
 	}
 	if err := rows.Err(); err != nil {
 		a.serverError(w, r, err)
@@ -209,20 +214,23 @@ func (a *API) createAcademicYear(w http.ResponseWriter, r *http.Request, id auth
 }
 
 func (a *API) listClasses(w http.ResponseWriter, r *http.Request, id auth.Identity) {
-	rows, err := a.db.Query(r.Context(), `SELECT c.id::text,c.name,c.grade_level,c.academic_year_id::text,y.name FROM classes c JOIN academic_years y ON y.id=c.academic_year_id AND y.school_id=c.school_id WHERE c.school_id=$1 ORDER BY y.starts_on DESC,c.grade_level,c.name LIMIT 200`, id.SchoolID)
+	// Classes of closed years are left out unless ?all=1, so pickers show this year.
+	rows, err := a.db.Query(r.Context(), `SELECT c.id::text,c.name,c.grade_level,c.academic_year_id::text,y.name,y.closed_at IS NOT NULL FROM classes c JOIN academic_years y ON y.id=c.academic_year_id AND y.school_id=c.school_id
+		WHERE c.school_id=$1 AND ($2 OR y.closed_at IS NULL) ORDER BY y.starts_on DESC,c.grade_level,c.name LIMIT 500`, id.SchoolID, r.URL.Query().Get("all") == "1")
 	if err != nil {
 		a.serverError(w, r, err)
 		return
 	}
 	defer rows.Close()
-	items := []map[string]string{}
+	items := []map[string]any{}
 	for rows.Next() {
 		var x [5]string
-		if err := rows.Scan(&x[0], &x[1], &x[2], &x[3], &x[4]); err != nil {
+		var closed bool
+		if err := rows.Scan(&x[0], &x[1], &x[2], &x[3], &x[4], &closed); err != nil {
 			a.serverError(w, r, err)
 			return
 		}
-		items = append(items, map[string]string{"id": x[0], "name": x[1], "grade_level": x[2], "academic_year_id": x[3], "academic_year_name": x[4]})
+		items = append(items, map[string]any{"id": x[0], "name": x[1], "grade_level": x[2], "academic_year_id": x[3], "academic_year_name": x[4], "year_closed": closed})
 	}
 	if err := rows.Err(); err != nil {
 		a.serverError(w, r, err)
@@ -372,13 +380,13 @@ func (a *API) createStudent(w http.ResponseWriter, r *http.Request, id auth.Iden
 		return
 	}
 	if req.ClassID != "" {
-		tag, e := tx.Exec(r.Context(), `INSERT INTO enrollments(school_id,student_id,class_id) SELECT $1,$2,c.id FROM classes c WHERE c.id=$3 AND c.school_id=$1`, id.SchoolID, student.ID, req.ClassID)
+		tag, e := tx.Exec(r.Context(), `INSERT INTO enrollments(school_id,student_id,class_id) SELECT $1,$2,c.id FROM classes c JOIN academic_years y ON y.id=c.academic_year_id AND y.closed_at IS NULL WHERE c.id=$3 AND c.school_id=$1`, id.SchoolID, student.ID, req.ClassID)
 		if e != nil {
 			a.databaseError(w, r, e)
 			return
 		}
 		if tag.RowsAffected() != 1 {
-			writeError(w, 400, "VALIDATION_ERROR", "Class does not belong to this school.", map[string]string{"class_id": "Unknown class."})
+			writeError(w, 400, "VALIDATION_ERROR", "Choose a class of this school in a year that is not closed.", map[string]string{"class_id": "Unknown or closed class."})
 			return
 		}
 	}
@@ -413,7 +421,7 @@ func (a *API) updateStudent(w http.ResponseWriter, r *http.Request, id auth.Iden
 		return
 	}
 	req.LegalName = strings.TrimSpace(req.LegalName)
-	if req.LegalName == "" || len(req.LegalName) > 200 || (req.Status != "active" && req.Status != "inactive") {
+	if req.LegalName == "" || len(req.LegalName) > 200 || !slices.Contains(studentStatuses, req.Status) {
 		writeError(w, 400, "VALIDATION_ERROR", "Provide a legal name and status of active or inactive.", nil)
 		return
 	}

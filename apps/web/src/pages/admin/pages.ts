@@ -4,6 +4,7 @@ export const adminPages = [
   { id: 'students', icon: '♧' },
   { id: 'attendance', icon: '✓' },
   { id: 'classes', icon: '▤' },
+  { id: 'year-end', icon: '↻' },
   { id: 'academic-passport', icon: '▧' },
   { id: 'curriculum', icon: '⌘' },
   { id: 'assessments', icon: '✎' },

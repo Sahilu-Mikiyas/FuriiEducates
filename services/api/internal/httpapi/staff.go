@@ -357,7 +357,7 @@ func (a *API) listTeacherClasses(w http.ResponseWriter, r *http.Request, id auth
 		FROM class_teachers ct
 		JOIN classes c ON c.id=ct.class_id AND c.school_id=ct.school_id
 		JOIN academic_years y ON y.id=c.academic_year_id AND y.school_id=c.school_id
-		WHERE ct.school_id=$1 AND ct.teacher_id=$2
+		WHERE ct.school_id=$1 AND ct.teacher_id=$2 AND y.closed_at IS NULL
 		ORDER BY y.starts_on DESC,c.grade_level,c.name`, id.SchoolID, id.UserID)
 	if err != nil {
 		a.serverError(w, r, err)

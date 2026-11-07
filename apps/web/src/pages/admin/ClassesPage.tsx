@@ -4,7 +4,7 @@ import { DateField } from '../../calendar/DateField'
 import { useDates } from '../../calendar/useDates'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
-import { useClasses, useRefresh, useYears } from '../../lib/queries'
+import { useAllClasses, useRefresh, useYears } from '../../lib/queries'
 import { ClassRoom, classLabel, Year } from '../../lib/types'
 
 export default function ClassesPage() {
@@ -13,7 +13,7 @@ export default function ClassesPage() {
   const { busy, run, onSubmit } = useAction()
   const [editing, setEditing] = useState('')
   const refresh = useRefresh()
-  const classes = useClasses().data ?? []
+  const classes = useAllClasses().data ?? []
   const years = useYears().data ?? []
 
   const addClass = onSubmit(async (f) => {

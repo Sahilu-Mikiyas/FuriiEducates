@@ -152,7 +152,7 @@ func (a *API) updateStudentProfile(w http.ResponseWriter, r *http.Request, id au
 		}
 		birth = &parsed
 	}
-	if req.Name == "" || len(req.Name) > 200 || (req.Gender != "" && req.Gender != "female" && req.Gender != "male") || (req.Status != "active" && req.Status != "inactive") || len(req.Address) > 500 || len(req.Medical) > 2000 {
+	if req.Name == "" || len(req.Name) > 200 || (req.Gender != "" && req.Gender != "female" && req.Gender != "male") || !slices.Contains(studentStatuses, req.Status) || len(req.Address) > 500 || len(req.Medical) > 2000 {
 		writeError(w, 400, "VALIDATION_ERROR", "Check the name, gender and status, and keep notes under 2,000 characters.", nil)
 		return
 	}
@@ -356,6 +356,9 @@ func (a *API) moveStudent(w http.ResponseWriter, r *http.Request, id auth.Identi
 	}
 	if !decode(w, r, &req) || !uuidPattern.MatchString(req.ClassID) {
 		writeError(w, 400, "VALIDATION_ERROR", "Choose a class.", nil)
+		return
+	}
+	if a.refuseClosedClass(w, r, id.SchoolID, req.ClassID) {
 		return
 	}
 	studentID := r.PathValue("studentID")

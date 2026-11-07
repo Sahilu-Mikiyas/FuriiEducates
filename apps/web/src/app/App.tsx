@@ -31,6 +31,7 @@ const AssessmentsPage = lazy(() => import('../pages/admin/AssessmentsPage'))
 const ResultsPage = lazy(() => import('../pages/admin/ResultsPage'))
 const StaffPage = lazy(() => import('../pages/admin/StaffPage'))
 const MessagesPage = lazy(() => import('../pages/admin/MessagesPage'))
+const YearEndPage = lazy(() => import('../pages/admin/YearEndPage'))
 const NotificationsPage = lazy(() => import('../features/notifications/notifications').then((m) => ({ default: m.NotificationsPage })))
 const SetupRequestsPage = lazy(() => import('../pages/admin/SetupRequestsPage'))
 const SettingsPage = lazy(() => import('../pages/admin/SettingsPage'))
@@ -139,6 +140,7 @@ export function App() {
         <Route path="lesson-plans" element={<LessonPlanReview />} />
         <Route path="staff" element={<StaffPage />} />
         <Route path="messages" element={<MessagesPage />} />
+        <Route path="year-end" element={<YearEndPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="demo-requests" element={<OperatorOnly><SetupRequestsPage /></OperatorOnly>} />
         <Route path="settings" element={<SettingsPage />} />

@@ -473,9 +473,10 @@ func (a *API) deleteClassSubject(w http.ResponseWriter, r *http.Request, id auth
 }
 
 type subjectAccess struct {
-	ClassID string
-	Name    string
-	CanEdit bool
+	ClassID    string
+	Name       string
+	CanEdit    bool
+	YearClosed bool
 }
 
 // loadSubjectAccess finds who can use a subject. An administrator or a teacher of
@@ -485,8 +486,9 @@ func (a *API) loadSubjectAccess(w http.ResponseWriter, r *http.Request, id auth.
 	var access subjectAccess
 	var assigned bool
 	err := a.db.QueryRow(r.Context(), `SELECT cs.class_id::text,cs.name,EXISTS(SELECT 1 FROM class_teachers ct WHERE ct.class_id=cs.class_id AND ct.teacher_id=$3),
-		$4 OR COALESCE(cs.teacher_id=$3,false) OR (cs.teacher_id IS NULL AND EXISTS(SELECT 1 FROM class_teachers ct WHERE ct.class_id=cs.class_id AND ct.teacher_id=$3))
-		FROM class_subjects cs WHERE cs.id=$1 AND cs.school_id=$2`, subjectID, id.SchoolID, id.UserID, hasRole(id.Roles, "school_admin")).Scan(&access.ClassID, &access.Name, &assigned, &access.CanEdit)
+		$4 OR COALESCE(cs.teacher_id=$3,false) OR (cs.teacher_id IS NULL AND EXISTS(SELECT 1 FROM class_teachers ct WHERE ct.class_id=cs.class_id AND ct.teacher_id=$3)),
+		EXISTS(SELECT 1 FROM classes c JOIN academic_years y ON y.id=c.academic_year_id WHERE c.id=cs.class_id AND y.closed_at IS NOT NULL)
+		FROM class_subjects cs WHERE cs.id=$1 AND cs.school_id=$2`, subjectID, id.SchoolID, id.UserID, hasRole(id.Roles, "school_admin")).Scan(&access.ClassID, &access.Name, &assigned, &access.CanEdit, &access.YearClosed)
 	if errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, 404, "NOT_FOUND", "Subject not found.", nil)
 		return access, false
@@ -503,6 +505,10 @@ func (a *API) loadSubjectAccess(w http.ResponseWriter, r *http.Request, id auth.
 }
 
 func (a *API) requireSubjectEdit(w http.ResponseWriter, access subjectAccess) bool {
+	if access.YearClosed {
+		writeYearClosed(w)
+		return false
+	}
 	if !access.CanEdit {
 		writeError(w, 403, "FORBIDDEN", "Another teacher enters the marks for this subject.", nil)
 	}

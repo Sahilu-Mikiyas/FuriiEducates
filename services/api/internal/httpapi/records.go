@@ -339,7 +339,7 @@ func syncStudentLogin(ctx context.Context, tx pgx.Tx, schoolID, studentID, statu
 	if err := tx.QueryRow(ctx, `SELECT user_id::text FROM students WHERE id=$1 AND school_id=$2`, studentID, schoolID).Scan(&userID); err != nil || userID == nil {
 		return err
 	}
-	if status == "inactive" {
+	if status != "active" {
 		if _, err := tx.Exec(ctx, `UPDATE users SET status='disabled' WHERE id=$1 AND status='active'`, *userID); err != nil {
 			return err
 		}
